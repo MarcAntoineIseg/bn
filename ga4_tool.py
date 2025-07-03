@@ -8,17 +8,33 @@ mcp = FastMCP("GA4SessionTool",host="0.0.0.0",port=8000)
 
 @mcp.tool()
 async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
-    """Fetch GA4 session count for the last 30 days."""
-    if not userId or not googleAnalyticsData:
-        return {"error": "Missing userId or googleAnalyticsData"}
+    """
+    Fetch GA4 session count for the last 30 days.
+
+    Args:
+        userId (str): The user's unique identifier (required by n8n and MCP client).
+        googleAnalyticsData (dict): Must include 'selectedProperty' with an 'id' key, e.g.:
+            {
+                "selectedProperty": {
+                    "id": "GA4_PROPERTY_ID"
+                }
+            }
+
+    Returns:
+        dict: Session count data or error message.
+    """
+    if not userId:
+        return {"error": "Missing userId (required by n8n/MCP client)"}
+    if not googleAnalyticsData:
+        return {"error": "Missing googleAnalyticsData (should include selectedProperty.id)"}
 
     property_id = googleAnalyticsData.get("selectedProperty", {}).get("id")
     if not property_id:
-        return {"error": "Missing GA4 property ID"}
+        return {"error": "Missing GA4 property ID in googleAnalyticsData.selectedProperty.id"}
 
     tokens = get_user_tokens(userId)
     if not tokens:
-        return {"error": "No credentials found for this user"}
+        return {"error": "No credentials found for this userId"}
 
     try:
         tokens = await check_and_refresh_token(userId, tokens)
@@ -32,6 +48,10 @@ async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
         return {"message": "Session count retrieved", "data": result}
     except Exception as e:
         return {"error": f"Google Analytics API error: {str(e)}"}
+
+@mcp.get("/health")
+async def health():
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     mcp.run(transport="sse")
