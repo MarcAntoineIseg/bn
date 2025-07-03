@@ -7,22 +7,21 @@ import asyncio
 mcp = FastMCP("GA4SessionTool",host="0.0.0.0",port=8000,debug=True)
 
 @mcp.tool()
-async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
+async def get_sessions(request: dict) -> dict:
     """
     Fetch GA4 session count for the last 30 days.
-
     Args:
-        userId (str): The user's unique identifier (required by n8n and MCP client).
-        googleAnalyticsData (dict): Must include 'selectedProperty' with an 'id' key, e.g.:
-            {
-                "selectedProperty": {
-                    "id": "GA4_PROPERTY_ID"
-                }
-            }
-
+        request (dict): Should contain:
+            - userId (str): User identifier
+            - googleAnalyticsData (dict): GA4 property data with selectedProperty.id
     Returns:
         dict: Session count data or error message.
     """
+    userId = request.get("userId")
+    googleAnalyticsData = request.get("googleAnalyticsData")
+    
+    
+    # ... rest of your existing code
     if not userId:
         return {"error": "Missing userId (required by n8n/MCP client)"}
     if not googleAnalyticsData:
