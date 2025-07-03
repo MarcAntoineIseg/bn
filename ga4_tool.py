@@ -7,22 +7,21 @@ import asyncio
 mcp = FastMCP("GA4SessionTool",host="0.0.0.0",port=8000,debug=True)
 
 @mcp.tool()
-async def get_sessions(googleAnalyticsData: dict) -> dict:
+async def get_sessions(googleAnalyticsData: dict = None, userId: str = None) -> dict:
     """
     Fetch GA4 session count for the last 30 days.
     Args:
-        googleAnalyticsData (dict): Must include 'selectedProperty' with an 'id' key, e.g.:
-            {
-                "selectedProperty": {
-                    "id": "GA4_PROPERTY_ID"
-                }
-            }
+        googleAnalyticsData (dict, optional): Must include 'selectedProperty' with an 'id' key
+        userId (str, optional): User ID (will be auto-detected if not provided)
     Returns:
         dict: Session count data or error message.
     """
-    # Get userId from n8n workflow context or environment
-    # You might need to modify this based on how n8n passes user context
-    userId = None  # You'll need to figure out how to get this from n8n
+    # Try to get userId from n8n context if not provided
+    if not userId:
+        userId = get_user_id_from_context()  # You'll need to implement this
+    
+    
+    # ... rest of your existing code
     
     if not userId:
         return {"error": "Missing userId from n8n context"}
