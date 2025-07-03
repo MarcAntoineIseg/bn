@@ -4,71 +4,77 @@ from services.ga4_client import get_session_count
 from utils.token_handler import check_and_refresh_token
 import asyncio
 import json
+import os
 
 mcp = FastMCP("GA4SessionTool", host="0.0.0.0", port=8000, debug=True)
 
 @mcp.tool()
-async def get_sessions(**kwargs) -> dict:
+async def get_sessions(kwargs: str = "") -> dict:
     """
     Fetch GA4 session count for the last 30 days.
-    This debug version accepts any parameters to see what n8n sends.
+    
+    This tool expects to receive user context and analytics data from n8n workflow.
+    The data should be available through n8n's workflow context or environment variables.
     """
-    # Log everything we receive
-    debug_info = {
-        "received_kwargs": kwargs,
-        "kwargs_keys": list(kwargs.keys()),
-        "kwargs_types": {k: type(v).__name__ for k, v in kwargs.items()}
-    }
     
-    print(f"DEBUG: Received from n8n: {json.dumps(debug_info, indent=2)}")
+    # Since n8n is sending empty kwargs, we need to get data from other sources
+    # Let's try multiple approaches to get the required data
     
-    # Try to extract userId and googleAnalyticsData from whatever n8n sends
+    # Approach 1: Try to parse kwargs if it contains JSON
     userId = None
     googleAnalyticsData = None
     
-    # Check common ways n8n might pass data
-    if 'userId' in kwargs:
-        userId = kwargs['userId']
-    elif 'user_id' in kwargs:
-        userId = kwargs['user_id']
-    elif 'id' in kwargs:
-        userId = kwargs['id']
+    if kwargs and kwargs.strip():
+        try:
+            data = json.loads(kwargs)
+            userId = data.get('userId')
+            googleAnalyticsData = data.get('googleAnalyticsData')
+        except:
+            pass
     
-    if 'googleAnalyticsData' in kwargs:
-        googleAnalyticsData = kwargs['googleAnalyticsData']
-    elif 'google_analytics_data' in kwargs:
-        googleAnalyticsData = kwargs['google_analytics_data']
-    elif 'analyticsData' in kwargs:
-        googleAnalyticsData = kwargs['analyticsData']
-    elif 'data' in kwargs:
-        googleAnalyticsData = kwargs['data']
-    
-    # Return debug info for now
-    return {
-        "debug": True,
-        "message": "Debug mode - showing what n8n sent",
-        "received_data": debug_info,
-        "extracted_userId": userId,
-        "extracted_googleAnalyticsData": googleAnalyticsData
-    }
-
-@mcp.tool()
-async def get_sessions_working(userId: str, googleAnalyticsData: dict) -> dict:
-    """
-    The actual working version - use this once we know the parameter names.
-    """
+    # Approach 2: Check environment variables (n8n might set these)
     if not userId:
-        return {"error": "Missing userId"}
-    if not googleAnalyticsData:
-        return {"error": "Missing googleAnalyticsData"}
+        userId = os.environ.get('N8N_USER_ID') or os.environ.get('USER_ID') or os.environ.get('USERID')
     
+    # Approach 3: Use a hardcoded test user ID for now (REMOVE THIS IN PRODUCTION)
+    if not userId:
+        # You need to replace this with actual user identification logic
+        userId = "test_user_id"  # TEMPORARY - replace with actual logic
+    
+    # Approach 4: Try to get GA4 property from environment or config
+    if not googleAnalyticsData:
+        property_id = os.environ.get('GA4_PROPERTY_ID')
+        if property_id:
+            googleAnalyticsData = {
+                "selectedProperty": {
+                    "id": property_id
+                }
+            }
+    
+    # If still no data, return instructions for setup
+    if not userId or not googleAnalyticsData:
+        return {
+            "error": "Missing required data",
+            "instructions": {
+                "message": "Please provide userId and googleAnalyticsData",
+                "received_kwargs": kwargs,
+                "solutions": [
+                    "Set N8N_USER_ID environment variable",
+                    "Set GA4_PROPERTY_ID environment variable", 
+                    "Or modify the n8n workflow to pass data correctly"
+                ]
+            }
+        }
+    
+    # Extract property ID
     property_id = googleAnalyticsData.get("selectedProperty", {}).get("id")
     if not property_id:
         return {"error": "Missing GA4 property ID in googleAnalyticsData.selectedProperty.id"}
     
+    # Get user tokens
     tokens = get_user_tokens(userId)
     if not tokens:
-        return {"error": "No credentials found for this userId"}
+        return {"error": f"No credentials found for userId: {userId}"}
     
     try:
         tokens = await check_and_refresh_token(userId, tokens)
@@ -77,6 +83,46 @@ async def get_sessions_working(userId: str, googleAnalyticsData: dict) -> dict:
     
     try:
         result = await get_session_count(tokens["access_token"], property_id)
+        if result["value"] == "0":
+            return {"message": "No sessions found", "data": result}
+        return {"message": "Session count retrieved", "data": result}
+    except Exception as e:
+        return {"error": f"Google Analytics API error: {str(e)}"}
+
+# Alternative tool that expects n8n to pass data differently
+@mcp.tool()
+async def get_sessions_with_params(userId: str, propertyId: str) -> dict:
+    """
+    Fetch GA4 session count with explicit parameters.
+    
+    Args:
+        userId: User identifier for token lookup
+        propertyId: GA4 property ID (e.g., "123456789")
+    """
+    if not userId:
+        return {"error": "Missing userId parameter"}
+    if not propertyId:
+        return {"error": "Missing propertyId parameter"}
+    
+    # Create googleAnalyticsData structure
+    googleAnalyticsData = {
+        "selectedProperty": {
+            "id": propertyId
+        }
+    }
+    
+    # Get user tokens
+    tokens = get_user_tokens(userId)
+    if not tokens:
+        return {"error": f"No credentials found for userId: {userId}"}
+    
+    try:
+        tokens = await check_and_refresh_token(userId, tokens)
+    except Exception as e:
+        return {"error": f"Token refresh failed: {str(e)}"}
+    
+    try:
+        result = await get_session_count(tokens["access_token"], propertyId)
         if result["value"] == "0":
             return {"message": "No sessions found", "data": result}
         return {"message": "Session count retrieved", "data": result}
