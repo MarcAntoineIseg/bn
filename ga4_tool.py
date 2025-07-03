@@ -49,9 +49,7 @@ async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
     except Exception as e:
         return {"error": f"Google Analytics API error: {str(e)}"}
 
-@mcp.get("/health")
-async def health():
-    return {"status": "ok"}
+
 
 if __name__ == "__main__":
     mcp.run(transport="sse")
