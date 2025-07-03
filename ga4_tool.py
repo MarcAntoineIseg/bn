@@ -34,4 +34,4 @@ async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
         return {"error": f"Google Analytics API error: {str(e)}"}
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    mcp.run(transport="sse")
