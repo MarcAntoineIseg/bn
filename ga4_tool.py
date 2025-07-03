@@ -4,7 +4,7 @@ from services.ga4_client import get_session_count
 from utils.token_handler import check_and_refresh_token
 import asyncio
 
-mcp = FastMCP("GA4SessionTool",host="0.0.0.0",port=8000)
+mcp = FastMCP("GA4SessionTool",host="0.0.0.0",port=8000,debug=True)
 
 @mcp.tool()
 async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
