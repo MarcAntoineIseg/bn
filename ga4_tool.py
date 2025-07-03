@@ -1,10 +1,10 @@
-from fastapi import FastAPI
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from services.supabase_client import get_user_tokens
 from services.ga4_client import get_session_count
 from utils.token_handler import check_and_refresh_token
+import asyncio
 
-mcp = FastMCP("GA4SessionTool")
+mcp = FastMCP("GA4SessionTool",host="0.0.0.0",port=8000)
 
 @mcp.tool()
 async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
@@ -33,8 +33,5 @@ async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
     except Exception as e:
         return {"error": f"Google Analytics API error: {str(e)}"}
 
-# Create the FastAPI app
-app = FastAPI(lifespan=mcp.http_app().lifespan)
-
-# Mount MCP at /mcp
-app.mount("/mcp", mcp.http_app())
+if __name__ == "__main__":
+    mcp.run(transport="streamable-http")
