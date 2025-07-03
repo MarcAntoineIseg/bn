@@ -1,3 +1,4 @@
+from fastapi import FastAPI
 from fastmcp import FastMCP
 from services.supabase_client import get_user_tokens
 from services.ga4_client import get_session_count
@@ -31,3 +32,9 @@ async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
         return {"message": "Session count retrieved", "data": result}
     except Exception as e:
         return {"error": f"Google Analytics API error: {str(e)}"}
+
+# Create the FastAPI app
+app = FastAPI(lifespan=mcp.http_app().lifespan)
+
+# Mount MCP at /mcp
+app.mount("/mcp", mcp.http_app())
