@@ -1,8 +1,7 @@
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from services.supabase_client import get_user_tokens
 from services.ga4_client import get_session_count
 from utils.token_handler import check_and_refresh_token
-import asyncio
 
 mcp = FastMCP("GA4SessionTool")
 
@@ -33,5 +32,5 @@ async def get_sessions(userId: str, googleAnalyticsData: dict) -> dict:
     except Exception as e:
         return {"error": f"Google Analytics API error: {str(e)}"}
 
-if __name__ == "__main__":
-    mcp.run(transport="http")
+# This is what makes it deployable on Railway
+app = mcp.app  # Expose the FastAPI app
