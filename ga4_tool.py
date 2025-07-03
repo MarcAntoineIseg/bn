@@ -20,7 +20,6 @@ async def get_sessions(userId: str = None, ga4PropertyId: str = None, webhookDat
         dict: Session count data or error message
     """
     
-    # Try to extract data from webhookData if provided
     if webhookData and isinstance(webhookData, dict):
         if not userId:
             userId = webhookData.get('userId')
@@ -29,32 +28,32 @@ async def get_sessions(userId: str = None, ga4PropertyId: str = None, webhookDat
             selected_property = ga4_data.get('selectedProperty', {})
             ga4PropertyId = selected_property.get('id')
     
-    # Validate required parameters
+   
     if not userId:
         return {"error": "Missing userId - please provide user ID or webhook data"}
     
     if not ga4PropertyId:
         return {"error": "Missing ga4PropertyId - please provide GA4 property ID or webhook data"}
     
-    # Create googleAnalyticsData structure
+
     googleAnalyticsData = {
         "selectedProperty": {
             "id": ga4PropertyId
         }
     }
     
-    # Get user tokens from Supabase
+ 
     tokens = get_user_tokens(userId)
     if not tokens:
         return {"error": f"No credentials found for userId: {userId}"}
     
-    # Refresh tokens if needed
+ 
     try:
         tokens = await check_and_refresh_token(userId, tokens)
     except Exception as e:
         return {"error": f"Token refresh failed: {str(e)}"}
     
-    # Get session count from GA4
+
     try:
         result = await get_session_count(tokens["access_token"], ga4PropertyId)
         if result["value"] == "0":
@@ -63,7 +62,7 @@ async def get_sessions(userId: str = None, ga4PropertyId: str = None, webhookDat
     except Exception as e:
         return {"error": f"Google Analytics API error: {str(e)}"}
 
-# Alternative: Simple tool that works with individual parameters
+
 @mcp.tool()
 async def get_sessions_simple(userId: str, ga4PropertyId: str) -> dict:
     """
@@ -76,26 +75,25 @@ async def get_sessions_simple(userId: str, ga4PropertyId: str) -> dict:
     Returns:
         dict: Session count data or error message
     """
-    
-    # Validate required parameters
+
     if not userId:
         return {"error": "Missing userId parameter"}
     
     if not ga4PropertyId:
         return {"error": "Missing ga4PropertyId parameter"}
     
-    # Get user tokens from Supabase
+
     tokens = get_user_tokens(userId)
     if not tokens:
         return {"error": f"No credentials found for userId: {userId}"}
     
-    # Refresh tokens if needed
+   
     try:
         tokens = await check_and_refresh_token(userId, tokens)
     except Exception as e:
         return {"error": f"Token refresh failed: {str(e)}"}
     
-    # Get session count from GA4
+  
     try:
         result = await get_session_count(tokens["access_token"], ga4PropertyId)
         if result["value"] == "0":
