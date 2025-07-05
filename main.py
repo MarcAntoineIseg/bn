@@ -5,7 +5,8 @@ from ga4_tool import mcp
 from services.supabase_client import get_user_tokens
 from utils.token_handler import check_and_refresh_token
 from services.ga4_client import run_dynamic_report
-from utils.ga4_schema import is_valid_metric, is_valid_dimension
+from utils.ga4_schema import is_valid_metric, is_valid_dimension, get_all_metrics, get_all_dimensions
+from utils.ga4_query_parser import parse_user_query
 
 # Get MCP's ASGI-compatible app
 mcp_app = mcp.http_app(path="/mcp")
@@ -56,3 +57,22 @@ async def query_ga4(request: QueryRequest):
         return {"message": "Résultat GA4 dynamique", "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur GA4: {str(e)}")
+
+# --- NOUVEAUX ENDPOINTS EXPERTS ---
+
+@app.get("/catalog")
+def get_catalog():
+    """Retourne toutes les metrics et dimensions disponibles dans le MCP."""
+    return {
+        "metrics": get_all_metrics(),
+        "dimensions": get_all_dimensions()
+    }
+
+class ExplainRequest(BaseModel):
+    question: str
+
+@app.post("/explain")
+def explain_question(req: ExplainRequest):
+    """Analyse une question utilisateur et retourne le mapping généré (metrics, dimensions, date_range, filters, limit, suggestion, llm_needed)."""
+    mapping = parse_user_query(req.question)
+    return mapping
