@@ -72,3 +72,89 @@ async def get_sessions_by_country(access_token: str, property_id: str):
     ]
 
     return result
+
+async def run_dynamic_report(access_token: str, property_id: str, metrics: list, dimensions: list, date_range: dict, filters: dict = None, limit: int = 100):
+    """
+    Exécute une requête dynamique sur l'API GA4 avec métriques, dimensions, plage de dates et filtres personnalisés.
+    """
+    url = f"https://analyticsdata.googleapis.com/v1beta/properties/{property_id}:runReport"
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+    body = {
+        "dateRanges": [{
+            "startDate": date_range.get("start_date", "30daysAgo"),
+            "endDate": date_range.get("end_date", "today")
+        }],
+        "metrics": [{"name": m} for m in metrics],
+        "dimensions": [{"name": d} for d in dimensions] if dimensions else [],
+        "limit": limit
+    }
+    if filters:
+        # Construction simple: chaque filtre = stringFilter (égalité)
+        body["dimensionFilter"] = {
+            "andGroup": {
+                "expressions": [
+                    {"filter": {"fieldName": k, "stringFilter": {"value": v}}}
+                    for k, v in filters.items()
+                ]
+            }
+        }
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, headers=headers, json=body)
+        response.raise_for_status()
+        data = response.json()
+    # Extraction des résultats
+    rows = data.get("rows", [])
+    dimension_headers = [d["name"] for d in data.get("dimensionHeaders", [])]
+    metric_headers = [m["name"] for m in data.get("metricHeaders", [])]
+    result = []
+    for row in rows:
+        entry = {}
+        for i, dim in enumerate(dimension_headers):
+            entry[dim] = row["dimensionValues"][i]["value"]
+        for j, met in enumerate(metric_headers):
+            entry[met] = row["metricValues"][j]["value"]
+        result.append(entry)
+    return result
+
+@mcp.tool()
+async def get_ga4_report(
+    userId: str,
+    ga4PropertyId: str,
+    metrics: list,
+    dimensions: list = [],
+    date_range: dict = None,
+    filters: dict = None,
+    limit: int = 100
+) -> dict:
+    """
+    Récupère dynamiquement n'importe quel rapport GA4 selon les paramètres fournis.
+    """
+    if not userId or not ga4PropertyId or not metrics:
+        return {"error": "userId, ga4PropertyId et metrics sont obligatoires"}
+    from services.supabase_client import get_user_tokens
+    from utils.token_handler import check_and_refresh_token
+    from services.ga4_client import run_dynamic_report
+
+    tokens = get_user_tokens(userId)
+    if not tokens:
+        return {"error": f"Aucun token trouvé pour l'utilisateur {userId}"}
+    try:
+        tokens = await check_and_refresh_token(userId, tokens)
+    except Exception as e:
+        return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
+
+    try:
+        result = await run_dynamic_report(
+            tokens["access_token"],
+            ga4PropertyId,
+            metrics,
+            dimensions or [],
+            date_range or {"start_date": "30daysAgo", "end_date": "today"},
+            filters or {},
+            limit
+        )
+        return {"message": "Résultat GA4 dynamique", "data": result}
+    except Exception as e:
+        return {"error": f"Erreur GA4: {str(e)}"}
