@@ -207,6 +207,10 @@ def parse_user_query(query: str):
             dimensions = [d for d in dimensions if d in GA4_COMPAT[metrics[0]]]
             if before != dimensions:
                 logging.info(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec la metric {metrics[0]} : {before} -> {dimensions}")
+        # Ajout automatique de la dimension 'date' si la question parle de mois
+        if any(kw in query for kw in ["par mois", "mois", "mensuel", "mois où", "mois avec", "mois le plus", "mois ayant"]):
+            if "date" not in dimensions:
+                dimensions.append("date")
     else:
         # 2. Fallback dynamique (ancien code)
         metrics = []
@@ -252,11 +256,9 @@ def parse_user_query(query: str):
             metrics = ["sessions"]
         # Extraction de la période
         date_range = extract_date_range(query)
-        # Ajout automatique de la dimension 'month' si la question parle de mois
+        # Ajout automatique de la dimension 'date' si la question parle de mois
         if any(kw in query for kw in ["par mois", "mois", "mensuel", "mois où", "mois avec", "mois le plus", "mois ayant"]):
-            if "month" in all_dimensions and "month" not in dimensions:
-                dimensions.append("month")
-            elif "date" in all_dimensions and "date" not in dimensions:
+            if "date" not in dimensions:
                 dimensions.append("date")
         # Nettoyage strict : ne garder que les dimensions compatibles
         if metrics and metrics[0] in GA4_COMPAT:
