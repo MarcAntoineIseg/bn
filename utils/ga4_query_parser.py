@@ -96,7 +96,8 @@ def parse_user_query(query: str):
     metrics = []
     dimensions = []
     filters = {}
-    date_range = {"start_date": "30daysAgo", "end_date": "today"}
+    # Par défaut : toute la période GA4
+    date_range = {"start_date": "2005-01-01", "end_date": "today"}
     suggestion = None
     limit = None
     llm_needed = False
@@ -170,6 +171,11 @@ def parse_user_query(query: str):
             "start_date": last_month_start.strftime("%Y-%m-%d"),
             "end_date": last_month_end.strftime("%Y-%m-%d")
         }
+
+    # Nettoyage : pour les questions top pages, ne garder que pagePath
+    if any(kw in query for kw in ["top", "pages", "plus vues", "meilleures pages", "page la plus visitée"]):
+        if "pagePath" in dimensions:
+            dimensions = ["pagePath"]
 
     # Valeur par défaut si aucune metric trouvée
     if not metrics:
