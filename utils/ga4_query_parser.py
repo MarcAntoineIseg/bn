@@ -102,6 +102,7 @@ def parse_user_query(query: str):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
     Utilise d'abord le router d'intention (GA4_INTENTS), puis fallback dynamique.
+    Nettoie strictement les dimensions pour ne garder que celles compatibles avec la metric principale.
     """
     query = query.lower()
     filters = {}
@@ -144,6 +145,18 @@ def parse_user_query(query: str):
             filters["deviceCategory"] = "desktop"
         # Suggestion
         suggestion = f"Intent détecté : {intent}."
+        # Nettoyage strict : ne garder que les dimensions compatibles
+        allowed_dims = set(config["dimensions"])
+        before = list(dimensions)
+        dimensions = [d for d in dimensions if d in allowed_dims]
+        if before != dimensions:
+            print(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec l'intention {intent}: {before} -> {dimensions}")
+        # Cas particulier : top page unique
+        if intent == "page_views" and ("top 1" in query or "page la plus vue" in query or "plus vue" in query):
+            metrics = ["screenPageViews"]
+            dimensions = ["pagePath"]
+            limit = 1
+            print("[GA4 MCP] Forçage mapping pour 'page la plus vue' : screenPageViews + pagePath, limit=1")
     else:
         # 2. Fallback dynamique (ancien code)
         metrics = []

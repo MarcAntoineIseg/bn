@@ -2,8 +2,8 @@ from mcp.server.fastmcp import FastMCP
 from services.supabase_client import get_user_tokens
 from services.ga4_client import run_dynamic_report
 from utils.token_handler import check_and_refresh_token
-from utils.ga4_query_parser import parse_user_query
-from datetime import datetime
+from utils.ga4_query_parser import parse_user_query, GA4_COMPAT
+from datetime import datetime, timezone
 
 mcp = FastMCP("GA4DynamicTool", host="0.0.0.0", port=8000, debug=True)
 
@@ -13,8 +13,8 @@ async def get_ga4_report(
     ga4PropertyId: str,
     metrics: list,
     dimensions: list = [],
-    date_range: dict = None,
-    filters: dict = None,
+    date_range: dict = {},
+    filters: dict = {},
     limit: int = 100
 ) -> dict:
     """
@@ -22,6 +22,15 @@ async def get_ga4_report(
     """
     if not userId or not ga4PropertyId or not metrics:
         return {"error": "userId, ga4PropertyId et metrics sont obligatoires"}
+
+    # Validation stricte de compatibilité metrics/dimensions
+    main_metric = metrics[0] if metrics else None
+    if main_metric and main_metric in GA4_COMPAT:
+        allowed_dims = GA4_COMPAT[main_metric]
+        before = list(dimensions)
+        dimensions = [d for d in dimensions if d in allowed_dims]
+        if before != dimensions:
+            print(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec {main_metric}: {before} -> {dimensions}")
 
     tokens = get_user_tokens(userId)
     if not tokens:
@@ -67,11 +76,24 @@ async def ask_ga4_report(
     limit = params.get("limit") or 100
     llm_needed = params.get("llm_needed", False)
 
-    # Contrôle explicite sur les dates
+    # Validation stricte de compatibilité metrics/dimensions
+    main_metric = metrics[0] if metrics else None
+    if main_metric and main_metric in GA4_COMPAT:
+        allowed_dims = GA4_COMPAT[main_metric]
+        before = list(dimensions)
+        dimensions = [d for d in dimensions if d in allowed_dims]
+        if before != dimensions:
+            print(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec {main_metric}: {before} -> {dimensions}")
+
+    # Log de la date système réelle
+    print("[GA4 MCP] Date système actuelle :", datetime.now(timezone.utc))
+
+    # Contrôle explicite sur les dates (UTC)
     def is_future_date(date_str):
         try:
-            date = datetime.strptime(date_str, "%Y-%m-%d")
-            return date > datetime.today()
+            date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            return date > now
         except Exception:
             return False
     if is_future_date(date_range["start_date"]) or is_future_date(date_range["end_date"]):
@@ -99,7 +121,7 @@ async def ask_ga4_report(
         )
         return {
             "message": f"Résultat pour la question : {question}",
-            "params": params,
+            "params": {**params, "dimensions": dimensions},
             "data": result,
             "suggestion": suggestion,
             "llm_needed": llm_needed
