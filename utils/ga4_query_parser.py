@@ -1,6 +1,7 @@
 import re
 from datetime import datetime, timedelta
 from utils.ga4_schema import get_all_metrics, get_all_dimensions, is_valid_metric, is_valid_dimension
+from utils.ga4_intents import detect_intent
 
 # Dictionnaire de synonymes/traductions pour metrics et dimensions GA4
 SYNONYMS = {
@@ -100,15 +101,10 @@ GA4_COMPAT = {
 def parse_user_query(query: str):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
-    Gère le top N, les recettes, les synonymes, et détecte les cas complexes.
-    Valide la compatibilité metrics/dimensions selon GA4.
+    Utilise d'abord le router d'intention (GA4_INTENTS), puis fallback dynamique.
     """
     query = query.lower()
-    metrics = []
-    dimensions = []
     filters = {}
-    # Par défaut : toute la période GA4
-    date_range = {"start_date": "2005-01-01", "end_date": "today"}
     suggestion = None
     limit = None
     llm_needed = False
@@ -116,84 +112,86 @@ def parse_user_query(query: str):
     all_metrics = get_all_metrics()
     all_dimensions = get_all_dimensions()
 
-    # 1. Règles intelligentes (recettes)
-    for rule in SMART_RULES:
-        if any(kw in query for kw in rule.get("keywords", [])):
-            for dim in rule.get("dimensions", []):
-                if dim in all_dimensions and dim not in dimensions:
-                    dimensions.append(dim)
-            for met in rule.get("metrics", []):
-                if met in all_metrics and met not in metrics:
-                    metrics.append(met)
-            if rule.get("suggestion"):
-                suggestion = rule["suggestion"]
-
-    # 2. Matching via synonymes/traductions
-    for word, ga4_name in SYNONYMS.items():
-        if word in query:
-            if ga4_name in all_metrics and ga4_name not in metrics:
-                metrics.append(ga4_name)
-            if ga4_name in all_dimensions and ga4_name not in dimensions:
-                dimensions.append(ga4_name)
-
-    # 3. Matching dynamique sur les metrics
-    for metric in all_metrics:
-        if metric.lower() in query and metric not in metrics:
-            metrics.append(metric)
-
-    # 4. Matching dynamique sur les dimensions
-    for dimension in all_dimensions:
-        if dimension.lower() in query and dimension not in dimensions:
-            dimensions.append(dimension)
-
-    # 5. Gestion du top N (top 5, top 10, etc.)
-    match = re.search(r'top ?(\d+)', query)
-    if match:
-        limit = int(match.group(1))
-    elif "top cinq" in query:
-        limit = 5
-    elif "top dix" in query:
-        limit = 10
-    elif any(kw in query for kw in ["top", "meilleurs", "plus vues", "plus visités", "plus visitées"]):
-        limit = 10
-
-    # Filtres simples (exemple)
-    if "france" in query:
-        filters["country"] = "France"
-    if "mobile" in query:
-        filters["deviceCategory"] = "mobile"
-    if "desktop" in query or "ordinateur" in query:
-        filters["deviceCategory"] = "desktop"
-
-    # Plage de dates
-    if "semaine dernière" in query:
-        today = datetime.today()
-        last_week = today - timedelta(days=7)
-        date_range = {
-            "start_date": last_week.strftime("%Y-%m-%d"),
-            "end_date": today.strftime("%Y-%m-%d")
-        }
-    elif "mois dernier" in query:
-        today = datetime.today()
-        first_day_this_month = today.replace(day=1)
-        last_month_end = first_day_this_month - timedelta(days=1)
-        last_month_start = last_month_end.replace(day=1)
-        date_range = {
-            "start_date": last_month_start.strftime("%Y-%m-%d"),
-            "end_date": last_month_end.strftime("%Y-%m-%d")
-        }
-
-    # Nettoyage : pour les questions top pages, ne garder que pagePath
-    if any(kw in query for kw in ["top", "pages", "plus vues", "meilleures pages", "page la plus visitée"]):
-        if "pagePath" in dimensions:
-            dimensions = ["pagePath"]
-
-    # Valeur par défaut si aucune metric trouvée
-    if not metrics:
-        metrics = ["sessions"]
-
+    # 1. Router d'intention (mapping expert)
+    intent, config = detect_intent(query)
+    if config:
+        metrics = list(config["metrics"])
+        # Dimensions : si la question précise une dimension compatible, on la garde, sinon on prend la principale
+        dimensions = []
+        for d in config["dimensions"]:
+            if d in query:
+                dimensions.append(d)
+        if not dimensions:
+            # fallback : dimension principale (ex : pagePath pour page views)
+            dimensions = [config["dimensions"][0]]
+        date_range = dict(config["default_time_range"])
+        # Gestion du limit (top N)
+        match = re.search(r'top ?(\d+)', query)
+        if match:
+            limit = int(match.group(1))
+        elif "top cinq" in query:
+            limit = 5
+        elif "top dix" in query:
+            limit = 10
+        elif any(kw in query for kw in ["top", "meilleurs", "plus vues", "plus visités", "plus visitées"]):
+            limit = 10
+        # Filtres simples
+        if "france" in query:
+            filters["country"] = "France"
+        if "mobile" in query:
+            filters["deviceCategory"] = "mobile"
+        if "desktop" in query or "ordinateur" in query:
+            filters["deviceCategory"] = "desktop"
+        # Suggestion
+        suggestion = f"Intent détecté : {intent}."
+    else:
+        # 2. Fallback dynamique (ancien code)
+        metrics = []
+        dimensions = []
+        # Matching via synonymes/traductions
+        for word, ga4_name in SYNONYMS.items():
+            if word in query:
+                if ga4_name in all_metrics and ga4_name not in metrics:
+                    metrics.append(ga4_name)
+                if ga4_name in all_dimensions and ga4_name not in dimensions:
+                    dimensions.append(ga4_name)
+        # Matching dynamique sur les metrics
+        for metric in all_metrics:
+            if metric.lower() in query and metric not in metrics:
+                metrics.append(metric)
+        # Matching dynamique sur les dimensions
+        for dimension in all_dimensions:
+            if dimension.lower() in query and dimension not in dimensions:
+                dimensions.append(dimension)
+        # Par défaut : toute la période GA4
+        date_range = {"start_date": "2005-01-01", "end_date": "today"}
+        # Gestion du limit (top N)
+        match = re.search(r'top ?(\d+)', query)
+        if match:
+            limit = int(match.group(1))
+        elif "top cinq" in query:
+            limit = 5
+        elif "top dix" in query:
+            limit = 10
+        elif any(kw in query for kw in ["top", "meilleurs", "plus vues", "plus visités", "plus visitées"]):
+            limit = 10
+        # Filtres simples
+        if "france" in query:
+            filters["country"] = "France"
+        if "mobile" in query:
+            filters["deviceCategory"] = "mobile"
+        if "desktop" in query or "ordinateur" in query:
+            filters["deviceCategory"] = "desktop"
+        # Suggestion
+        suggestion = "Aucune intention explicite détectée, fallback dynamique."
+        # Valeur par défaut si aucune metric trouvée
+        if not metrics:
+            metrics = ["sessions"]
+        # Nettoyage : pour les questions top pages, ne garder que pagePath
+        if any(kw in query for kw in ["top", "pages", "plus vues", "meilleures pages", "page la plus visitée"]):
+            if "pagePath" in dimensions:
+                dimensions = ["pagePath"]
     # --- Validation de compatibilité metrics/dimensions ---
-    # On ne garde que les dimensions compatibles avec la première metric principale
     main_metric = metrics[0] if metrics else None
     if main_metric and main_metric in GA4_COMPAT:
         compatible_dims = GA4_COMPAT[main_metric]
@@ -201,12 +199,10 @@ def parse_user_query(query: str):
         dimensions = [d for d in dimensions if d in compatible_dims]
         if before != dimensions:
             print(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec {main_metric}: {before} -> {dimensions}")
-
     # Si la question est trop complexe ou ne matche rien, indiquer qu'un LLM est nécessaire
     if not metrics and not dimensions:
         llm_needed = True
         suggestion = "Je n'ai pas compris la question, peux-tu la reformuler ou préciser ce que tu veux savoir ?"
-
     return {
         "metrics": metrics,
         "dimensions": dimensions,
