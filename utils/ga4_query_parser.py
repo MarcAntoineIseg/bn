@@ -252,6 +252,12 @@ def parse_user_query(query: str):
             metrics = ["sessions"]
         # Extraction de la période
         date_range = extract_date_range(query)
+        # Ajout automatique de la dimension 'month' si la question parle de mois
+        if any(kw in query for kw in ["par mois", "mois", "mensuel", "mois où", "mois avec", "mois le plus", "mois ayant"]):
+            if "month" in all_dimensions and "month" not in dimensions:
+                dimensions.append("month")
+            elif "date" in all_dimensions and "date" not in dimensions:
+                dimensions.append("date")
         # Nettoyage strict : ne garder que les dimensions compatibles
         if metrics and metrics[0] in GA4_COMPAT:
             before = list(dimensions)
