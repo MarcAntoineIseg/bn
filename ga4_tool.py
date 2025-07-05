@@ -3,6 +3,7 @@ from services.supabase_client import get_user_tokens
 from services.ga4_client import run_dynamic_report
 from utils.token_handler import check_and_refresh_token
 from utils.ga4_query_parser import parse_user_query
+from datetime import datetime
 
 mcp = FastMCP("GA4DynamicTool", host="0.0.0.0", port=8000, debug=True)
 
@@ -65,6 +66,16 @@ async def ask_ga4_report(
     suggestion = params.get("suggestion")
     limit = params.get("limit") or 100
     llm_needed = params.get("llm_needed", False)
+
+    # Contrôle explicite sur les dates
+    def is_future_date(date_str):
+        try:
+            date = datetime.strptime(date_str, "%Y-%m-%d")
+            return date > datetime.today()
+        except Exception:
+            return False
+    if is_future_date(date_range["start_date"]) or is_future_date(date_range["end_date"]):
+        return {"error": "La période demandée est dans le futur. Merci de choisir une période antérieure ou actuelle."}
 
     # 2. Récupère les tokens utilisateur
     tokens = get_user_tokens(userId)
