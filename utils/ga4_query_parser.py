@@ -1,10 +1,41 @@
 import re
 from datetime import datetime, timedelta
+from utils.ga4_schema import get_all_metrics, get_all_dimensions
+
+# Dictionnaire de synonymes/traductions pour metrics et dimensions GA4
+SYNONYMS = {
+    # Metrics
+    "utilisateur": "totalUsers",
+    "utilisateurs": "totalUsers",
+    "users": "totalUsers",
+    "sessions": "sessions",
+    "session": "sessions",
+    "revenu": "totalRevenue",
+    "recette": "totalRevenue",
+    "conversion": "conversions",
+    "conversions": "conversions",
+    # Dimensions
+    "pays": "country",
+    "pays d'origine": "country",
+    "country": "country",
+    "ville": "city",
+    "city": "city",
+    "source": "source",
+    "sources": "source",
+    "canal": "sessionDefaultChannelGroup",
+    "canal par défaut": "sessionDefaultChannelGroup",
+    "channel": "sessionDefaultChannelGroup",
+    "date": "date",
+    "jour": "date",
+    "appareil": "deviceCategory",
+    "mobile": "deviceCategory",
+    # ... à enrichir selon les besoins
+}
 
 def parse_user_query(query: str):
     """
-    Parse une question utilisateur en français pour extraire metrics, dimensions, date_range et filters.
-    Retourne un dictionnaire prêt à être utilisé pour get_ga4_report.
+    Parse une question utilisateur pour extraire metrics, dimensions, date_range et filters.
+    Matching dynamique sur toutes les metrics/dimensions connues + mapping synonymes.
     """
     query = query.lower()
     metrics = []
@@ -12,32 +43,32 @@ def parse_user_query(query: str):
     filters = {}
     date_range = {"start_date": "30daysAgo", "end_date": "today"}
 
-    # Métriques
-    if "session" in query:
-        metrics.append("sessions")
-    if "utilisateur" in query or "user" in query:
-        metrics.append("totalUsers")
-    if "revenu" in query:
-        metrics.append("totalRevenue")
-    if "conversion" in query:
-        metrics.append("conversions")
-    # Ajoute d'autres règles selon les besoins
+    all_metrics = get_all_metrics()
+    all_dimensions = get_all_dimensions()
 
-    # Dimensions
-    if "par pays" in query or "country" in query or "france" in query:
-        dimensions.append("country")
-    if "par date" in query or "jour" in query or "date" in query:
-        dimensions.append("date")
-    if "ville" in query or "city" in query:
-        dimensions.append("city")
-    # Ajoute d'autres règles selon les besoins
+    # 1. Matching via synonymes/traductions
+    for word, ga4_name in SYNONYMS.items():
+        if word in query:
+            if ga4_name in all_metrics and ga4_name not in metrics:
+                metrics.append(ga4_name)
+            if ga4_name in all_dimensions and ga4_name not in dimensions:
+                dimensions.append(ga4_name)
 
-    # Filtres
+    # 2. Matching dynamique sur les metrics
+    for metric in all_metrics:
+        if metric.lower() in query and metric not in metrics:
+            metrics.append(metric)
+
+    # 3. Matching dynamique sur les dimensions
+    for dimension in all_dimensions:
+        if dimension.lower() in query and dimension not in dimensions:
+            dimensions.append(dimension)
+
+    # Filtres simples (exemple)
     if "france" in query:
         filters["country"] = "France"
     if "mobile" in query:
         filters["deviceCategory"] = "mobile"
-    # Ajoute d'autres règles selon les besoins
 
     # Plage de dates
     if "semaine dernière" in query:
@@ -56,11 +87,11 @@ def parse_user_query(query: str):
             "start_date": last_month_start.strftime("%Y-%m-%d"),
             "end_date": last_month_end.strftime("%Y-%m-%d")
         }
-    # Ajoute d'autres règles selon les besoins
 
-    # Valeurs par défaut si rien trouvé
+    # Valeur par défaut si aucune metric trouvée
     if not metrics:
         metrics = ["sessions"]
+
     return {
         "metrics": metrics,
         "dimensions": dimensions,
