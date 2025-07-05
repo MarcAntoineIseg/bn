@@ -4,6 +4,7 @@ from google.analytics.data_v1beta.types import (
 )
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+import httpx
 
 
 async def get_session_count(access_token: str, property_id: str):
@@ -41,8 +42,6 @@ async def get_session_count(access_token: str, property_id: str):
             "metric": "sessions_last_30_days",
             "value": "0"
         }
-
-import httpx
 
 async def get_sessions_by_country(access_token: str, property_id: str):
     url = f"https://analyticsdata.googleapis.com/v1beta/properties/{property_id}:runReport"
@@ -117,44 +116,3 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
             entry[met] = row["metricValues"][j]["value"]
         result.append(entry)
     return result
-
-@mcp.tool()
-async def get_ga4_report(
-    userId: str,
-    ga4PropertyId: str,
-    metrics: list,
-    dimensions: list = [],
-    date_range: dict = None,
-    filters: dict = None,
-    limit: int = 100
-) -> dict:
-    """
-    Récupère dynamiquement n'importe quel rapport GA4 selon les paramètres fournis.
-    """
-    if not userId or not ga4PropertyId or not metrics:
-        return {"error": "userId, ga4PropertyId et metrics sont obligatoires"}
-    from services.supabase_client import get_user_tokens
-    from utils.token_handler import check_and_refresh_token
-    from services.ga4_client import run_dynamic_report
-
-    tokens = get_user_tokens(userId)
-    if not tokens:
-        return {"error": f"Aucun token trouvé pour l'utilisateur {userId}"}
-    try:
-        tokens = await check_and_refresh_token(userId, tokens)
-    except Exception as e:
-        return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
-
-    try:
-        result = await run_dynamic_report(
-            tokens["access_token"],
-            ga4PropertyId,
-            metrics,
-            dimensions or [],
-            date_range or {"start_date": "30daysAgo", "end_date": "today"},
-            filters or {},
-            limit
-        )
-        return {"message": "Résultat GA4 dynamique", "data": result}
-    except Exception as e:
-        return {"error": f"Erreur GA4: {str(e)}"}
