@@ -4,6 +4,10 @@ from services.ga4_client import run_dynamic_report
 from utils.token_handler import check_and_refresh_token
 from utils.ga4_query_parser import parse_user_query, GA4_COMPAT
 from datetime import datetime, timezone
+from services.nlp_service import analyze_question
+from services.mapping_service import map_intent, validate_mapping
+from services.payload_builder import build_payload
+from services.formatter import format_response
 
 mcp = FastMCP("GA4DynamicTool", host="0.0.0.0", port=8000, debug=True)
 
@@ -136,6 +140,57 @@ async def ask_ga4_report(
         }
     except Exception as e:
         return {"error": f"Erreur GA4: {str(e)}"}
+
+@mcp.tool()
+async def ask_ga4_report_ai(
+    userId: str,
+    ga4PropertyId: str,
+    question: str
+) -> dict:
+    """
+    Pipeline MCP AI-powered : analyse, mapping, validation, payload, exécution, formatage.
+    """
+    # 1. Analyse sémantique (LLM ou fallback)
+    nlp_result = analyze_question(question)
+    print("[MCP] NLP result:", nlp_result)
+
+    # 2. Mapping expert + validation
+    mapping = map_intent(nlp_result)
+    validation = validate_mapping(mapping)
+    print("[MCP] Mapping validé:", validation)
+
+    if not validation.get("is_valid", False):
+        return format_response(error=validation.get("error"), suggestion=validation.get("suggestion"))
+
+    # 3. Construction du payload GA4
+    payload = build_payload(validation)
+    print("[MCP] Payload GA4:", payload)
+
+    # 4. Récupération des tokens utilisateur
+    tokens = get_user_tokens(userId)
+    if not tokens:
+        return format_response(error=f"Aucun token trouvé pour l'utilisateur {userId}")
+    try:
+        tokens = await check_and_refresh_token(userId, tokens)
+    except Exception as e:
+        return format_response(error=f"Erreur lors du rafraîchissement du token: {str(e)}")
+
+    # 5. Appel à GA4
+    try:
+        data = await run_dynamic_report(
+            tokens["access_token"],
+            ga4PropertyId,
+            payload["metrics"],
+            payload["dimensions"],
+            payload["date_range"],
+            payload.get("filters", {}),
+            payload.get("limit", 100)
+        )
+    except Exception as e:
+        return format_response(error=f"Erreur GA4: {str(e)}")
+
+    # 6. Formatage de la réponse
+    return format_response(data=data, mapping=validation)
 
 if __name__ == "__main__":
     mcp.run(transport="sse")
