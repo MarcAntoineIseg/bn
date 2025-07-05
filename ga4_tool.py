@@ -88,7 +88,6 @@ async def ask_ga4_report(
     # Log de la date système réelle
     print("[GA4 MCP] Date système actuelle :", datetime.now(timezone.utc))
 
-    # Contrôle explicite sur les dates (UTC)
     def is_future_date(date_str):
         try:
             date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -96,8 +95,17 @@ async def ask_ga4_report(
             return date > now
         except Exception:
             return False
-    if is_future_date(date_range["start_date"]) or is_future_date(date_range["end_date"]):
-        return {"error": "La période demandée est dans le futur. Merci de choisir une période antérieure ou actuelle."}
+    def today_str():
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Si la date de fin est dans le futur, on la ramène à aujourd'hui
+    if is_future_date(date_range["end_date"]):
+        old_end = date_range["end_date"]
+        date_range["end_date"] = today_str()
+        print(f"[GA4 MCP] Date de fin dans le futur ({old_end}), ramenée à aujourd'hui ({date_range['end_date']})")
+    # Si la date de début est dans le futur, on retourne une erreur explicite
+    if is_future_date(date_range["start_date"]):
+        return {"error": "La période demandée commence dans le futur. Merci de choisir une période antérieure ou actuelle."}
 
     # 2. Récupère les tokens utilisateur
     tokens = get_user_tokens(userId)
