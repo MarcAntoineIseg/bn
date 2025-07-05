@@ -5,6 +5,10 @@ from google.analytics.data_v1beta.types import (
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 import httpx
+from utils.ga4_query_parser import parse_user_query
+from services.supabase_client import get_user_tokens
+from utils.token_handler import check_and_refresh_token
+from services.ga4_client import run_dynamic_report
 
 
 async def get_session_count(access_token: str, property_id: str):
@@ -116,3 +120,77 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
             entry[met] = row["metricValues"][j]["value"]
         result.append(entry)
     return result
+
+def parse_user_query(query):
+    # Exemples très simplifiés
+    if "sessions" in query:
+        metrics = ["sessions"]
+    elif "utilisateurs" in query:
+        metrics = ["totalUsers"]
+    # etc.
+
+    if "par pays" in query or "en France" in query:
+        dimensions = ["country"]
+        filters = {"country": "France"} if "France" in query else {}
+    else:
+        dimensions = []
+        filters = {}
+
+    # Détection de la période
+    if "semaine dernière" in query:
+        date_range = {"start_date": "7daysAgo", "end_date": "today"}
+    else:
+        date_range = {"start_date": "30daysAgo", "end_date": "today"}
+
+    return {
+        "metrics": metrics,
+        "dimensions": dimensions,
+        "date_range": date_range,
+        "filters": filters
+    }
+
+@mcp.tool()
+async def ask_ga4_report(
+    userId: str,
+    ga4PropertyId: str,
+    question: str
+) -> dict:
+    """
+    Analyse la question utilisateur, déduit metrics/dimensions/date_range/filters, exécute la requête GA4 et retourne la réponse.
+    """
+    if not userId or not ga4PropertyId or not question:
+        return {"error": "userId, ga4PropertyId et question sont obligatoires"}
+
+    # 1. Analyse la question
+    params = parse_user_query(question)
+    metrics = params["metrics"]
+    dimensions = params["dimensions"]
+    date_range = params["date_range"]
+    filters = params["filters"]
+
+    # 2. Récupère les tokens utilisateur
+    tokens = get_user_tokens(userId)
+    if not tokens:
+        return {"error": f"Aucun token trouvé pour l'utilisateur {userId}"}
+    try:
+        tokens = await check_and_refresh_token(userId, tokens)
+    except Exception as e:
+        return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
+
+    # 3. Appelle GA4 dynamiquement
+    try:
+        result = await run_dynamic_report(
+            tokens["access_token"],
+            ga4PropertyId,
+            metrics,
+            dimensions,
+            date_range,
+            filters
+        )
+        return {
+            "message": f"Résultat pour la question : {question}",
+            "params": params,
+            "data": result
+        }
+    except Exception as e:
+        return {"error": f"Erreur GA4: {str(e)}"}
