@@ -140,6 +140,35 @@ def fallback_llm(query):
         "suggestion": "Je n'ai pas compris la question, pouvez-vous la reformuler ?"
     }
 
+def validate_payload(metrics, dimensions, date_range, filters):
+    """
+    Validation stricte du payload pour éviter toute erreur 400 GA4.
+    - Toujours un metric valide (sessions par défaut)
+    - Dimensions compatibles avec la metric principale
+    - Date range non futur
+    - Filtres sur dimensions existantes
+    """
+    all_metrics = get_all_metrics()
+    all_dimensions = get_all_dimensions()
+    # 1. Metric obligatoire et valide
+    if not metrics or metrics[0] not in all_metrics:
+        metrics = ["sessions"]
+    # 2. Dimensions compatibles
+    main_metric = metrics[0]
+    if main_metric in GA4_COMPAT:
+        dimensions = [d for d in dimensions if d in GA4_COMPAT[main_metric]]
+    else:
+        dimensions = []
+    # 3. Date range
+    today = datetime.utcnow().date()
+    if "end_date" in date_range and date_range["end_date"] > today.strftime("%Y-%m-%d"):
+        date_range["end_date"] = today.strftime("%Y-%m-%d")
+    if "start_date" in date_range and date_range["start_date"] > today.strftime("%Y-%m-%d"):
+        date_range["start_date"] = today.strftime("%Y-%m-%d")
+    # 4. Filtres valides
+    filters = {k: v for k, v in filters.items() if k in all_dimensions}
+    return metrics, dimensions, date_range, filters
+
 def parse_user_query(query: str):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
@@ -273,6 +302,8 @@ def parse_user_query(query: str):
     if not metrics and not dimensions:
         llm_needed = True
         suggestion = "Je n'ai pas compris la question, peux-tu la reformuler ou préciser ce que tu veux savoir ?"
+    # À la toute fin, AVANT le return :
+    metrics, dimensions, date_range, filters = validate_payload(metrics, dimensions, date_range, filters)
     return {
         "metrics": metrics,
         "dimensions": dimensions,
