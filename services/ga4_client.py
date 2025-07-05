@@ -8,7 +8,6 @@ import httpx
 from utils.ga4_query_parser import parse_user_query
 from services.supabase_client import get_user_tokens
 from utils.token_handler import check_and_refresh_token
-from services.ga4_client import run_dynamic_report
 
 
 async def get_session_count(access_token: str, property_id: str):
