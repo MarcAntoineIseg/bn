@@ -75,7 +75,7 @@ async def get_sessions_by_country(access_token: str, property_id: str):
 
     return result
 
-async def run_dynamic_report(access_token: str, property_id: str, metrics: list, dimensions: list, date_range: dict, filters: dict = None, limit: int = 100):
+async def run_dynamic_report(access_token: str, property_id: str, metrics: list, dimensions: list, date_range: dict, filters: dict = {}, limit: int = 100):
     """
     Exécute une requête dynamique sur l'API GA4 avec métriques, dimensions, plage de dates et filtres personnalisés.
     """
@@ -119,31 +119,3 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
             entry[met] = row["metricValues"][j]["value"]
         result.append(entry)
     return result
-
-def parse_user_query(query):
-    # Exemples très simplifiés
-    if "sessions" in query:
-        metrics = ["sessions"]
-    elif "utilisateurs" in query:
-        metrics = ["totalUsers"]
-    # etc.
-
-    if "par pays" in query or "en France" in query:
-        dimensions = ["country"]
-        filters = {"country": "France"} if "France" in query else {}
-    else:
-        dimensions = []
-        filters = {}
-
-    # Détection de la période
-    if "semaine dernière" in query:
-        date_range = {"start_date": "7daysAgo", "end_date": "today"}
-    else:
-        date_range = {"start_date": "30daysAgo", "end_date": "today"}
-
-    return {
-        "metrics": metrics,
-        "dimensions": dimensions,
-        "date_range": date_range,
-        "filters": filters
-    }
