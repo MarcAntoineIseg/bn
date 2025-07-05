@@ -63,6 +63,8 @@ async def ask_ga4_report(
     date_range = params["date_range"]
     filters = params["filters"]
     suggestion = params.get("suggestion")
+    limit = params.get("limit") or 100
+    llm_needed = params.get("llm_needed", False)
 
     # 2. Récupère les tokens utilisateur
     tokens = get_user_tokens(userId)
@@ -81,13 +83,15 @@ async def ask_ga4_report(
             metrics,
             dimensions,
             date_range,
-            filters
+            filters,
+            limit
         )
         return {
             "message": f"Résultat pour la question : {question}",
             "params": params,
             "data": result,
-            "suggestion": suggestion
+            "suggestion": suggestion,
+            "llm_needed": llm_needed
         }
     except Exception as e:
         return {"error": f"Erreur GA4: {str(e)}"}

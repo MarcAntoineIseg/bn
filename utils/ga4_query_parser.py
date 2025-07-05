@@ -14,6 +14,14 @@ SYNONYMS = {
     "recette": "totalRevenue",
     "conversion": "conversions",
     "conversions": "conversions",
+    "pages vues": "screenPageViews",
+    "page vue": "screenPageViews",
+    "page": "pagePath",
+    "pages": "pagePath",
+    "taux de rebond": "bounceRate",
+    "rebond": "bounceRate",
+    "durée moyenne": "averageSessionDuration",
+    "temps moyen": "averageSessionDuration",
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
@@ -29,6 +37,8 @@ SYNONYMS = {
     "jour": "date",
     "appareil": "deviceCategory",
     "mobile": "deviceCategory",
+    "desktop": "deviceCategory",
+    "ordinateur": "deviceCategory",
     "genre": "userGender",
     "sexe": "userGender",
     "âge": "userAgeBracket",
@@ -58,13 +68,29 @@ SMART_RULES = [
         "dimensions": ["source", "sessionDefaultChannelGroup"],
         "suggestion": "Voici la répartition par source ou canal d'acquisition."
     },
+    {
+        "keywords": ["taux de rebond", "rebond", "bounce rate"],
+        "metrics": ["bounceRate"],
+        "suggestion": None
+    },
+    {
+        "keywords": ["durée moyenne", "temps moyen", "average session duration"],
+        "metrics": ["averageSessionDuration"],
+        "suggestion": None
+    },
+    {
+        "keywords": ["page", "pages", "plus vues", "top pages", "meilleures pages", "page la plus visitée", "top 10", "top 5", "top dix", "top cinq"],
+        "metrics": ["screenPageViews"],
+        "dimensions": ["pagePath"],
+        "suggestion": "Voici le classement des pages les plus vues."
+    },
     # ... à enrichir selon les besoins
 ]
 
 def parse_user_query(query: str):
     """
-    Parse une question utilisateur pour extraire metrics, dimensions, date_range et filters.
-    Matching dynamique sur toutes les metrics/dimensions connues + mapping synonymes + suggestions intelligentes.
+    Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
+    Gère le top N, les recettes, les synonymes, et détecte les cas complexes.
     """
     query = query.lower()
     metrics = []
@@ -72,17 +98,23 @@ def parse_user_query(query: str):
     filters = {}
     date_range = {"start_date": "30daysAgo", "end_date": "today"}
     suggestion = None
+    limit = None
+    llm_needed = False
 
     all_metrics = get_all_metrics()
     all_dimensions = get_all_dimensions()
 
     # 1. Règles intelligentes (recettes)
     for rule in SMART_RULES:
-        if any(kw in query for kw in rule["keywords"]):
-            for dim in rule["dimensions"]:
+        if any(kw in query for kw in rule.get("keywords", [])):
+            for dim in rule.get("dimensions", []):
                 if dim in all_dimensions and dim not in dimensions:
                     dimensions.append(dim)
-            suggestion = rule.get("suggestion")
+            for met in rule.get("metrics", []):
+                if met in all_metrics and met not in metrics:
+                    metrics.append(met)
+            if rule.get("suggestion"):
+                suggestion = rule["suggestion"]
 
     # 2. Matching via synonymes/traductions
     for word, ga4_name in SYNONYMS.items():
@@ -102,11 +134,24 @@ def parse_user_query(query: str):
         if dimension.lower() in query and dimension not in dimensions:
             dimensions.append(dimension)
 
+    # 5. Gestion du top N (top 5, top 10, etc.)
+    match = re.search(r'top ?(\d+)', query)
+    if match:
+        limit = int(match.group(1))
+    elif "top cinq" in query:
+        limit = 5
+    elif "top dix" in query:
+        limit = 10
+    elif any(kw in query for kw in ["top", "meilleurs", "plus vues", "plus visités", "plus visitées"]):
+        limit = 10
+
     # Filtres simples (exemple)
     if "france" in query:
         filters["country"] = "France"
     if "mobile" in query:
         filters["deviceCategory"] = "mobile"
+    if "desktop" in query or "ordinateur" in query:
+        filters["deviceCategory"] = "desktop"
 
     # Plage de dates
     if "semaine dernière" in query:
@@ -130,10 +175,17 @@ def parse_user_query(query: str):
     if not metrics:
         metrics = ["sessions"]
 
+    # Si la question est trop complexe ou ne matche rien, indiquer qu'un LLM est nécessaire
+    if not metrics and not dimensions:
+        llm_needed = True
+        suggestion = "Je n'ai pas compris la question, peux-tu la reformuler ou préciser ce que tu veux savoir ?"
+
     return {
         "metrics": metrics,
         "dimensions": dimensions,
         "date_range": date_range,
         "filters": filters,
-        "suggestion": suggestion
+        "limit": limit,
+        "suggestion": suggestion,
+        "llm_needed": llm_needed
     } 
