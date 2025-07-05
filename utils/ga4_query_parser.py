@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timedelta
-from utils.ga4_schema import get_all_metrics, get_all_dimensions
+from utils.ga4_schema import get_all_metrics, get_all_dimensions, is_valid_metric, is_valid_dimension
 
 # Dictionnaire de synonymes/traductions pour metrics et dimensions GA4
 SYNONYMS = {
@@ -87,10 +87,21 @@ SMART_RULES = [
     # ... à enrichir selon les besoins
 ]
 
+# Mapping minimal de compatibilité metrics/dimensions GA4 (à enrichir selon la doc officielle)
+GA4_COMPAT = {
+    "screenPageViews": ["pagePath", "pageTitle", "country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
+    "sessions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
+    "totalUsers": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
+    "bounceRate": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
+    "averageSessionDuration": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
+    # ... à enrichir pour chaque metric clé
+}
+
 def parse_user_query(query: str):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
     Gère le top N, les recettes, les synonymes, et détecte les cas complexes.
+    Valide la compatibilité metrics/dimensions selon GA4.
     """
     query = query.lower()
     metrics = []
@@ -180,6 +191,16 @@ def parse_user_query(query: str):
     # Valeur par défaut si aucune metric trouvée
     if not metrics:
         metrics = ["sessions"]
+
+    # --- Validation de compatibilité metrics/dimensions ---
+    # On ne garde que les dimensions compatibles avec la première metric principale
+    main_metric = metrics[0] if metrics else None
+    if main_metric and main_metric in GA4_COMPAT:
+        compatible_dims = GA4_COMPAT[main_metric]
+        before = list(dimensions)
+        dimensions = [d for d in dimensions if d in compatible_dims]
+        if before != dimensions:
+            print(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec {main_metric}: {before} -> {dimensions}")
 
     # Si la question est trop complexe ou ne matche rien, indiquer qu'un LLM est nécessaire
     if not metrics and not dimensions:
