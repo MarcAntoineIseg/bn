@@ -29,24 +29,62 @@ SYNONYMS = {
     "jour": "date",
     "appareil": "deviceCategory",
     "mobile": "deviceCategory",
+    "genre": "userGender",
+    "sexe": "userGender",
+    "âge": "userAgeBracket",
+    "age": "userAgeBracket",
     # ... à enrichir selon les besoins
 }
+
+# Recettes intelligentes pour questions fréquentes
+SMART_RULES = [
+    {
+        "keywords": ["âge", "age", "moyenne d'âge", "âge moyen"],
+        "dimensions": ["userAgeBracket"],
+        "suggestion": "La moyenne d'âge n'est pas disponible, mais voici la répartition par tranche d'âge."
+    },
+    {
+        "keywords": ["genre", "sexe"],
+        "dimensions": ["userGender"],
+        "suggestion": "La répartition par genre est disponible via la dimension 'userGender'."
+    },
+    {
+        "keywords": ["appareil", "device", "mobile", "desktop", "ordinateur"],
+        "dimensions": ["deviceCategory"],
+        "suggestion": "Voici la répartition par type d'appareil (mobile, desktop, etc.)."
+    },
+    {
+        "keywords": ["source", "trafic", "acquisition", "canal", "channel"],
+        "dimensions": ["source", "sessionDefaultChannelGroup"],
+        "suggestion": "Voici la répartition par source ou canal d'acquisition."
+    },
+    # ... à enrichir selon les besoins
+]
 
 def parse_user_query(query: str):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range et filters.
-    Matching dynamique sur toutes les metrics/dimensions connues + mapping synonymes.
+    Matching dynamique sur toutes les metrics/dimensions connues + mapping synonymes + suggestions intelligentes.
     """
     query = query.lower()
     metrics = []
     dimensions = []
     filters = {}
     date_range = {"start_date": "30daysAgo", "end_date": "today"}
+    suggestion = None
 
     all_metrics = get_all_metrics()
     all_dimensions = get_all_dimensions()
 
-    # 1. Matching via synonymes/traductions
+    # 1. Règles intelligentes (recettes)
+    for rule in SMART_RULES:
+        if any(kw in query for kw in rule["keywords"]):
+            for dim in rule["dimensions"]:
+                if dim in all_dimensions and dim not in dimensions:
+                    dimensions.append(dim)
+            suggestion = rule.get("suggestion")
+
+    # 2. Matching via synonymes/traductions
     for word, ga4_name in SYNONYMS.items():
         if word in query:
             if ga4_name in all_metrics and ga4_name not in metrics:
@@ -54,12 +92,12 @@ def parse_user_query(query: str):
             if ga4_name in all_dimensions and ga4_name not in dimensions:
                 dimensions.append(ga4_name)
 
-    # 2. Matching dynamique sur les metrics
+    # 3. Matching dynamique sur les metrics
     for metric in all_metrics:
         if metric.lower() in query and metric not in metrics:
             metrics.append(metric)
 
-    # 3. Matching dynamique sur les dimensions
+    # 4. Matching dynamique sur les dimensions
     for dimension in all_dimensions:
         if dimension.lower() in query and dimension not in dimensions:
             dimensions.append(dimension)
@@ -96,5 +134,6 @@ def parse_user_query(query: str):
         "metrics": metrics,
         "dimensions": dimensions,
         "date_range": date_range,
-        "filters": filters
+        "filters": filters,
+        "suggestion": suggestion
     } 
