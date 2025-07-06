@@ -109,7 +109,7 @@ SYNONYMS = {
 SMART_RULES = [
     {
         "keywords": ["produit", "produits", "plus vendus", "plus vendues", "meilleurs produits", "top produits"],
-        "metrics": ["ecommercePurchases"],
+        "metrics": ["itemPurchaseQuantity"],
         "dimensions": ["itemName"],
         "suggestion": "Voici le classement des produits les plus vendus."
     },
