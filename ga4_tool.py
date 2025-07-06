@@ -4,12 +4,24 @@ from services.ga4_client import run_dynamic_report
 from utils.token_handler import check_and_refresh_token
 from utils.ga4_query_parser import parse_user_query
 import logging
+from datetime import datetime
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP("GA4DynamicTool", host="0.0.0.0", port=8000, debug=True)
+
+def filter_future_dates(data):
+    today = datetime.today().strftime('%Y%m%d')
+    filtered = []
+    for row in data:
+        date_str = row.get('date')
+        if date_str and date_str <= today:
+            filtered.append(row)
+        elif not date_str:
+            filtered.append(row)
+    return filtered
 
 @mcp.tool()
 async def get_ga4_report(
@@ -96,6 +108,10 @@ async def ask_ga4_report(
                 filters,
                 limit
             )
+            
+            # Filtrage des dates futures dans les résultats détaillés
+            if isinstance(result, dict) and "detailed_data" in result:
+                result["detailed_data"] = filter_future_dates(result["detailed_data"])
             
             # Gestion de la nouvelle structure de réponse
             if isinstance(result, dict) and "detailed_data" in result:
