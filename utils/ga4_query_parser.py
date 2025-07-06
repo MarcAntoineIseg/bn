@@ -2,7 +2,7 @@ import re
 from datetime import datetime, timedelta
 from utils.ga4_schema import get_all_metrics, get_all_dimensions, is_valid_metric, is_valid_dimension
 from utils.ga4_intents import detect_intent
-import dateparser
+from dateparser.search import search_dates
 
 # Dictionnaire de synonymes/traductions pour metrics et dimensions GA4
 SYNONYMS = {
@@ -179,7 +179,7 @@ def parse_user_query(query: str):
                 dimensions.append(dimension)
         # --- DÉTECTION AUTOMATIQUE DE PÉRIODE AVEC DATEPARSER ---
         # Recherche d'expressions de dates dans la question (français)
-        date_matches = dateparser.search.search_dates(query, languages=['fr'])
+        date_matches = search_dates(query, languages=['fr'])
         start_date, end_date = None, None
         if date_matches:
             # Si deux dates trouvées, on prend la première comme début, la deuxième comme fin
