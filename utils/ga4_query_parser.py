@@ -195,17 +195,16 @@ def detect_date_range(query: str) -> dict:
     }
     
     current_year = datetime.now().year
+    # Règle spéciale : 'depuis [mois]'
     for month_name, month_num in month_patterns.items():
-        if month_name in query:
+        match = re.search(r'depuis ' + month_name + r'( \d{4})?', query)
+        if match:
             # Cherche l'année dans la question
             year_match = re.search(r'(\d{4})', query)
             year = int(year_match.group(1)) if year_match else current_year
-            # Trouve le dernier jour du mois
-            last_day = calendar.monthrange(year, int(month_num))[1]
-            return {
-                "start_date": f"{year}-{month_num}-01",
-                "end_date": f"{year}-{month_num}-{last_day:02d}"
-            }
+            start_date = f"{year}-{month_num}-01"
+            end_date = datetime.today().strftime('%Y-%m-%d')
+            return {"start_date": start_date, "end_date": end_date}
     
     # Détection "X derniers mois"
     match = re.search(r'(\d+) derniers mois', query)
