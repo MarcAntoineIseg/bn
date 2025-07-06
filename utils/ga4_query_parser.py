@@ -110,6 +110,10 @@ GA4_COMPAT = {
     # ... à enrichir pour chaque metric clé
 }
 
+PAID_CHANNELS = [
+    "Paid Search", "Paid Social", "Paid Shopping", "Paid Video", "Paid Other", "Paid Display", "Paid Affiliate", "Paid Discovery", "Paid"  # pour matcher large
+]
+
 def detect_date_range(query: str) -> dict:
     """
     Détecte la plage de dates dans la question utilisateur.
@@ -132,7 +136,6 @@ def detect_date_range(query: str) -> dict:
         return {"start_date": "365daysAgo", "end_date": "today"}
     
     # Détection des mois spécifiques
-    import re
     month_patterns = {
         "janvier": "01", "février": "02", "mars": "03", "avril": "04",
         "mai": "05", "juin": "06", "juillet": "07", "août": "08",
@@ -151,6 +154,19 @@ def detect_date_range(query: str) -> dict:
                 "start_date": f"{year}-{month_num}-01",
                 "end_date": f"{year}-{month_num}-{last_day:02d}"
             }
+    
+    # Détection "X derniers mois"
+    match = re.search(r'(\d+) derniers mois', query)
+    if match:
+        nb_months = int(match.group(1))
+        today = datetime.today()
+        # 1er jour du mois il y a nb_months
+        first_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        for _ in range(nb_months-1):
+            first_month = (first_month - timedelta(days=1)).replace(day=1)
+        start_date = first_month.strftime('%Y-%m-%d')
+        end_date = today.strftime('%Y-%m-%d')
+        return {"start_date": start_date, "end_date": end_date}
     
     # Par défaut : depuis le début de GA4 (14 août 2015)
     return {"start_date": "2015-08-14", "end_date": "today"}
@@ -327,6 +343,22 @@ def parse_user_query(query: str):
         suggestion = "Je n'ai pas compris la question, peux-tu la reformuler ou préciser ce que tu veux savoir ?"
     metrics, dimensions, suggestions = validate_metrics_and_dimensions(metrics, dimensions)
     if suggestions: suggestion = (suggestion or "") + " " + " ".join(suggestions)
+    # --- Règles métier supplémentaires ---
+    # 1. Détection évolution (par mois)
+    if any(kw in query for kw in ["évolution", "par mois", "mois", "mensuel", "mois par mois"]):
+        if "month" not in dimensions:
+            dimensions.append("month")
+    # 2. Détection organique
+    if any(kw in query for kw in ["organique", "seo", "organic"]):
+        filters["sessionDefaultChannelGroup"] = "Organic Search"
+    # 3. Détection paid
+    if any(kw in query for kw in ["paid", "payant", "sea", "ads", "adwords", "sponsored", "cpc"]):
+        filters["sessionDefaultChannelGroup"] = PAID_CHANNELS
+    # Nettoyage : si filtre paid, transformer en filtre OR sur tous les paid
+    if isinstance(filters.get("sessionDefaultChannelGroup"), list):
+        # On construit un filtre OR GA4
+        paid_values = filters["sessionDefaultChannelGroup"]
+        filters["sessionDefaultChannelGroup"] = {"inListFilter": {"values": paid_values}}
     return {
         "metrics": metrics,
         "dimensions": dimensions,
