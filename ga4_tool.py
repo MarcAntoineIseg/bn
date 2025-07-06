@@ -40,6 +40,14 @@ async def get_ga4_report(
     except Exception as e:
         return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
 
+    print(f"[GA4 MCP] 🚀 Appel de get_ga4_report avec:")
+    print(f"   - Property ID: {ga4PropertyId}")
+    print(f"   - Métriques: {metrics}")
+    print(f"   - Dimensions: {dimensions or []}")
+    print(f"   - Date range: {date_range or {'start_date': '30daysAgo', 'end_date': 'today'}}")
+    print(f"   - Filtres: {filters or {}}")
+    print(f"   - Limite: {limit}")
+    
     try:
         result = await run_dynamic_report(
             tokens["access_token"],
@@ -50,8 +58,10 @@ async def get_ga4_report(
             filters or {},
             limit
         )
+        print(f"[GA4 MCP] ✅ Succès - {len(result)} lignes retournées")
         return {"message": "Résultat GA4 dynamique", "data": result}
     except Exception as e:
+        print(f"[GA4 MCP] ❌ Erreur lors de l'appel GA4: {type(e).__name__}: {str(e)}")
         return {"error": f"Erreur GA4: {str(e)}"}
 
 @mcp.tool()
@@ -109,6 +119,14 @@ async def ask_ga4_report(
         return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
     
     # 3. Appelle GA4 dynamiquement
+    print(f"[GA4 MCP] 🚀 Appel de run_dynamic_report avec:")
+    print(f"   - Property ID: {ga4PropertyId}")
+    print(f"   - Métriques: {metrics}")
+    print(f"   - Dimensions: {dimensions}")
+    print(f"   - Date range: {date_range}")
+    print(f"   - Filtres: {filters}")
+    print(f"   - Limite: {limit}")
+    
     try:
         result = await run_dynamic_report(
             tokens["access_token"],
@@ -119,6 +137,7 @@ async def ask_ga4_report(
             filters,
             limit
         )
+        print(f"[GA4 MCP] ✅ Succès - {len(result)} lignes retournées")
         return {
             "message": f"Résultat pour la question : {question}",
             "params": {**params, "dimensions": dimensions},
@@ -127,6 +146,7 @@ async def ask_ga4_report(
             "llm_needed": llm_needed
         }
     except Exception as e:
+        print(f"[GA4 MCP] ❌ Erreur lors de l'appel GA4: {type(e).__name__}: {str(e)}")
         return {"error": f"Erreur GA4: {str(e)}"}
 
 if __name__ == "__main__":

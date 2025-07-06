@@ -75,7 +75,7 @@ async def get_sessions_by_country(access_token: str, property_id: str):
 
     return result
 
-async def run_dynamic_report(access_token: str, property_id: str, metrics: list, dimensions: list, date_range: dict, filters: dict = None, limit: int = 100):
+async def run_dynamic_report(access_token: str, property_id: str, metrics: list, dimensions: list, date_range: dict, filters: dict = {}, limit: int = 100):
     """
     Exécute une requête dynamique sur l'API GA4 avec métriques, dimensions, plage de dates et filtres personnalisés.
     """
@@ -102,10 +102,49 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
                 ]
             }
         }
+    
+    # LOGS DÉTAILLÉS POUR DEBUG
+    print("=" * 80)
+    print("🔍 LOGS DÉTAILLÉS - REQUÊTE GA4")
+    print("=" * 80)
+    print(f"📡 URL: {url}")
+    print(f"🔑 Token (premiers 20 chars): {access_token[:20]}...")
+    print(f"📊 Property ID: {property_id}")
+    print(f"📈 Métriques: {metrics}")
+    print(f"📏 Dimensions: {dimensions}")
+    print(f"📅 Plage de dates: {date_range}")
+    print(f"🔍 Filtres: {filters}")
+    print(f"📋 Limite: {limit}")
+    print("📦 Body complet envoyé à GA4:")
+    import json
+    print(json.dumps(body, indent=2, ensure_ascii=False))
+    print("=" * 80)
+    
     async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, json=body)
-        response.raise_for_status()
-        data = response.json()
+        try:
+            response = await client.post(url, headers=headers, json=body)
+            print(f"✅ Statut de réponse: {response.status_code}")
+            print(f"📄 Headers de réponse: {dict(response.headers)}")
+            
+            if response.status_code != 200:
+                print(f"❌ ERREUR {response.status_code}:")
+                error_text = response.text
+                print(error_text)
+                print("=" * 80)
+                response.raise_for_status()
+            
+            data = response.json()
+            print(f"✅ Réponse GA4 reçue avec succès")
+            print(f"📊 Nombre de lignes: {len(data.get('rows', []))}")
+            print("=" * 80)
+            
+        except Exception as e:
+            print(f"❌ EXCEPTION lors de l'appel GA4:")
+            print(f"   Type: {type(e).__name__}")
+            print(f"   Message: {str(e)}")
+            print("=" * 80)
+            raise
+    
     # Extraction des résultats
     rows = data.get("rows", [])
     dimension_headers = [d["name"] for d in data.get("dimensionHeaders", [])]
