@@ -2,7 +2,6 @@ import re
 from datetime import datetime, timedelta
 from utils.ga4_schema import get_all_metrics, get_all_dimensions, is_valid_metric, is_valid_dimension
 from utils.ga4_intents import detect_intent
-from dateparser.search import search_dates
 
 # Dictionnaire de synonymes/traductions pour metrics et dimensions GA4
 SYNONYMS = {
@@ -103,7 +102,6 @@ def parse_user_query(query: str):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
     Utilise d'abord le router d'intention (GA4_INTENTS), puis fallback dynamique.
-    Nettoie strictement les dimensions pour ne garder que celles compatibles avec la metric principale.
     """
     query = query.lower()
     filters = {}
@@ -146,18 +144,6 @@ def parse_user_query(query: str):
             filters["deviceCategory"] = "desktop"
         # Suggestion
         suggestion = f"Intent détecté : {intent}."
-        # Nettoyage strict : ne garder que les dimensions compatibles
-        allowed_dims = set(config["dimensions"])
-        before = list(dimensions)
-        dimensions = [d for d in dimensions if d in allowed_dims]
-        if before != dimensions:
-            print(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec l'intention {intent}: {before} -> {dimensions}")
-        # Cas particulier : top page unique
-        if intent == "page_views" and ("top 1" in query or "page la plus vue" in query or "plus vue" in query):
-            metrics = ["screenPageViews"]
-            dimensions = ["pagePath"]
-            limit = 1
-            print("[GA4 MCP] Forçage mapping pour 'page la plus vue' : screenPageViews + pagePath, limit=1")
     else:
         # 2. Fallback dynamique (ancien code)
         metrics = []
@@ -177,51 +163,8 @@ def parse_user_query(query: str):
         for dimension in all_dimensions:
             if dimension.lower() in query and dimension not in dimensions:
                 dimensions.append(dimension)
-        # --- DÉTECTION AUTOMATIQUE DE PÉRIODE AVEC DATEPARSER ---
-        # Recherche d'expressions de dates dans la question (français)
-        date_matches = search_dates(query, languages=['fr'])
-        start_date, end_date = None, None
-        if date_matches:
-            # Si deux dates trouvées, on prend la première comme début, la deuxième comme fin
-            if len(date_matches) >= 2:
-                start_date = date_matches[0][1].date()
-                end_date = date_matches[1][1].date()
-            # Si une seule date trouvée
-            elif len(date_matches) == 1:
-                # Si la question contient 'depuis', on prend cette date comme début, fin = aujourd'hui
-                if 'depuis' in query or 'à partir du' in query or 'à partir de' in query:
-                    start_date = date_matches[0][1].date()
-                    end_date = datetime.utcnow().date()
-                # Sinon, on prend la date trouvée comme début ET fin
-                else:
-                    start_date = date_matches[0][1].date()
-                    end_date = date_matches[0][1].date()
-            # On formate les dates
-            if start_date and end_date:
-                date_range = {
-                    "start_date": start_date.strftime("%Y-%m-%d"),
-                    "end_date": end_date.strftime("%Y-%m-%d")
-                }
-                print(f"[GA4 MCP] Période détectée automatiquement par dateparser : {date_range}")
-            else:
-                # fallback manuel si parsing incomplet
-                date_range = None
-        # --- DÉTECTION PÉRIODE "30 DERNIERS JOURS" ---
-        if not date_range:
-            if (
-                "30 derniers jours" in query
-                or "trente derniers jours" in query
-                or re.search(r"30 ?jours", query)
-            ):
-                end_date = datetime.utcnow().date()
-                start_date = end_date - timedelta(days=29)
-                date_range = {
-                    "start_date": start_date.strftime("%Y-%m-%d"),
-                    "end_date": end_date.strftime("%Y-%m-%d")
-                }
-            else:
-                # Par défaut : toute la période GA4
-                date_range = {"start_date": "2005-01-01", "end_date": "today"}
+        # Par défaut : toute la période GA4
+        date_range = {"start_date": "2005-01-01", "end_date": "today"}
         # Gestion du limit (top N)
         match = re.search(r'top ?(\d+)', query)
         if match:

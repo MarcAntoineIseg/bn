@@ -67,4 +67,3 @@ fastmcp
 httpx
 python-dotenv
 # (plus any other you use like supabase, google-auth etc.)
-dateparser
