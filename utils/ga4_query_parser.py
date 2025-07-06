@@ -289,18 +289,15 @@ def parse_user_query(query: str):
         metrics = list(config["metrics"])
         # Adaptation pour les moyennes
         metrics = adapt_metrics_for_average(query, metrics)
-        
         # Dimensions : si la question précise une dimension compatible, on la garde, sinon on prend la principale
         dimensions = []
         for d in config["dimensions"]:
             if d in query:
                 dimensions.append(d)
         if not dimensions:
-            # fallback : dimension principale (ex : pagePath pour page views)
             dimensions = [config["dimensions"][0]]
-        # Détection intelligente de la plage de dates
-        detected_range = detect_date_range(query)
-        date_range = detected_range if detected_range != {"start_date": "30daysAgo", "end_date": "today"} else dict(config["default_time_range"])
+        # Utilise toujours detect_date_range pour la période, même si une intention est détectée
+        date_range = detect_date_range(query)
         # Gestion du limit (top N)
         match = re.search(r'top ?(\d+)', query)
         if match:
