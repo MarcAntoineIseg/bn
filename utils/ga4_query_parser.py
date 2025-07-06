@@ -32,6 +32,10 @@ SYNONYMS = {
     "durée": "averageSessionDuration",
     "longtemps": "averageSessionDuration",
     "passe le plus de temps": "averageSessionDuration",
+    "taux de conversion": "userConversionRate",
+    "conversion rate": "userConversionRate",
+    "mobile vs desktop": "deviceCategory",
+    "desktop vs mobile": "deviceCategory",
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
@@ -114,6 +118,12 @@ SMART_RULES = [
         "dimensions": ["pagePath"],
         "suggestion": "Voici la durée moyenne des sessions par page."
     },
+    {
+        "keywords": ["taux de conversion", "conversion rate", "mobile vs desktop", "desktop vs mobile", "taux conversion", "conversion mobile", "conversion desktop"],
+        "metrics": ["userConversionRate"],
+        "dimensions": ["deviceCategory"],
+        "suggestion": "Voici le taux de conversion par device (mobile vs desktop)."
+    },
     # ... à enrichir selon les besoins
 ]
 
@@ -125,6 +135,7 @@ GA4_COMPAT = {
     "bounceRate": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     "averageSessionDuration": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     "conversions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath", "medium"],
+    "userConversionRate": ["deviceCategory", "country", "date", "sessionDefaultChannelGroup", "source", "pagePath"],
     # ... à enrichir pour chaque metric clé
 }
 
@@ -218,7 +229,7 @@ def adapt_metrics_for_average(query: str, metrics: list) -> list:
 
 def validate_metrics_and_dimensions(metrics, dimensions):
     """
-    Pour chaque métrique, ne garde que les dimensions compatibles. Si aucune dimension n'est compatible, fallback sur la dimension principale de la métrique.
+    Pour chaque métrique, ne garde que les dimensions compatibles. Si aucune dimension n'est compatible, ne force plus de fallback sur une dimension par défaut (total global si aucune dimension explicite).
     Retourne (metrics_valid, dimensions_valid, suggestions)
     """
     suggestions = []
@@ -230,12 +241,6 @@ def validate_metrics_and_dimensions(metrics, dimensions):
             if dims_ok:
                 metrics_valid.append(metric)
                 dimensions_valid += dims_ok
-            else:
-                # Fallback sur la dimension principale de la métrique
-                main_dim = GA4_COMPAT[metric][0]
-                metrics_valid.append(metric)
-                dimensions_valid.append(main_dim)
-                suggestions.append(f"La dimension demandée n'est pas compatible avec {metric}, fallback sur {main_dim}.")
         else:
             # Si la métrique n'est pas dans le mapping, on la garde sans validation
             metrics_valid.append(metric)
@@ -399,6 +404,23 @@ def parse_user_query(query: str):
             # On met averageSessionDuration en premier
             metrics = [m for m in metrics if m != "averageSessionDuration"]
             metrics = ["averageSessionDuration"] + metrics
+    # Ajout dans parse_user_query (avant le return)
+    conversion_keywords = ["taux de conversion", "conversion rate", "mobile vs desktop", "desktop vs mobile", "taux conversion", "conversion mobile", "conversion desktop"]
+    if any(kw in query for kw in conversion_keywords):
+        # On force la métrique userConversionRate et la dimension deviceCategory
+        if "userConversionRate" not in metrics:
+            metrics = ["userConversionRate"] + metrics
+        else:
+            metrics = [m for m in metrics if m != "userConversionRate"]
+            metrics = ["userConversionRate"] + metrics
+        if "deviceCategory" not in dimensions:
+            dimensions = ["deviceCategory"] + dimensions
+        else:
+            dimensions = [d for d in dimensions if d != "deviceCategory"]
+            dimensions = ["deviceCategory"] + dimensions
+        # On retire tout filtre sur deviceCategory pour permettre la comparaison
+        if "deviceCategory" in filters:
+            del filters["deviceCategory"]
     return {
         "metrics": metrics,
         "dimensions": dimensions,
