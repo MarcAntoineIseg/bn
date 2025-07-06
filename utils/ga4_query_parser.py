@@ -356,7 +356,7 @@ def validate_metrics_and_dimensions(metrics, dimensions):
 def parse_user_query(query: str, previous_metrics=None, previous_dimensions=None):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
-    Utilise d'abord le router d'intention (GA4_INTENTS), puis fallback dynamique.
+    Utilise d'abord les SMART_RULES (prioritaire), puis le router d'intention (GA4_INTENTS), puis fallback dynamique.
     Si aucune métrique/dimension n'est détectée dans la question, reprend celles du contexte précédent (si fourni).
     """
     query = query.lower()
@@ -367,6 +367,43 @@ def parse_user_query(query: str, previous_metrics=None, previous_dimensions=None
 
     all_metrics = get_all_metrics()
     all_dimensions = get_all_dimensions()
+
+    # --- Application prioritaire des SMART_RULES ---
+    for rule in SMART_RULES:
+        if any(kw in query for kw in rule.get("keywords", [])):
+            metrics = rule.get("metrics", [])
+            dimensions = rule.get("dimensions", [])
+            suggestion = rule.get("suggestion")
+            # Détection de la période
+            date_range = detect_date_range(query)
+            # Gestion du limit (top N)
+            match = re.search(r'top ?(\d+)', query)
+            if match:
+                limit = int(match.group(1))
+            elif "top cinq" in query:
+                limit = 5
+            elif "top dix" in query:
+                limit = 10
+            elif any(kw in query for kw in ["top", "meilleurs", "plus vues", "plus visités", "plus visitées"]):
+                limit = 10
+            # Filtres simples
+            if "france" in query:
+                filters["country"] = "France"
+            if "mobile" in query:
+                filters["deviceCategory"] = "mobile"
+            if "desktop" in query or "ordinateur" in query:
+                filters["deviceCategory"] = "desktop"
+            # Validation compatibilité
+            metrics, dimensions, _ = validate_metrics_and_dimensions(metrics, dimensions)
+            return {
+                "metrics": metrics,
+                "dimensions": dimensions,
+                "date_range": date_range,
+                "filters": filters,
+                "limit": limit,
+                "suggestion": suggestion,
+                "llm_needed": llm_needed
+            }
 
     # --- Détection explicite de ratio 'X par Y' ---
     ratio_match = re.search(r"([\w\s]+) par ([\w\s]+)", query)
