@@ -28,6 +28,10 @@ SYNONYMS = {
     "moyen": "average",
     "en moyenne": "average",
     "moyennement": "average",
+    "temps": "averageSessionDuration",
+    "durée": "averageSessionDuration",
+    "longtemps": "averageSessionDuration",
+    "passe le plus de temps": "averageSessionDuration",
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
@@ -37,7 +41,7 @@ SYNONYMS = {
     "source": "source",
     "sources": "source",
     "canal": "sessionDefaultChannelGroup",
-    "canal par défaut": "sessionDefaultChannelGroup",
+    "canaux": "sessionDefaultChannelGroup",
     "channel": "sessionDefaultChannelGroup",
     "date": "date",
     "jour": "date",
@@ -49,6 +53,9 @@ SYNONYMS = {
     "sexe": "userGender",
     "âge": "userAgeBracket",
     "age": "userAgeBracket",
+    "origine": "source",
+    "acquisition": "sessionDefaultChannelGroup",
+    "medium": "medium",
     # ... à enrichir selon les besoins
 }
 
@@ -96,6 +103,17 @@ SMART_RULES = [
         "dimensions": ["date"],
         "suggestion": "Voici les données avec les moyennes calculées."
     },
+    {
+        "keywords": ["canal", "canaux", "source", "origine", "acquisition", "channel", "medium"],
+        "dimensions": ["sessionDefaultChannelGroup", "source", "medium"],
+        "suggestion": "Voici la répartition par canal/source d'acquisition."
+    },
+    {
+        "keywords": ["temps", "durée", "longtemps", "passe le plus de temps", "temps moyen", "durée moyenne"],
+        "metrics": ["averageSessionDuration"],
+        "dimensions": ["pagePath"],
+        "suggestion": "Voici la durée moyenne des sessions par page."
+    },
     # ... à enrichir selon les besoins
 ]
 
@@ -106,7 +124,7 @@ GA4_COMPAT = {
     "totalUsers": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     "bounceRate": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     "averageSessionDuration": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
-    "conversions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
+    "conversions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath", "medium"],
     # ... à enrichir pour chaque metric clé
 }
 
@@ -359,6 +377,28 @@ def parse_user_query(query: str):
         # On construit un filtre OR GA4
         paid_values = filters["sessionDefaultChannelGroup"]
         filters["sessionDefaultChannelGroup"] = {"inListFilter": {"values": paid_values}}
+    # Si la question contient canal/source/acquisition, prioriser cette dimension
+    canal_keywords = ["canal", "canaux", "source", "origine", "acquisition", "channel", "medium"]
+    if any(kw in query for kw in canal_keywords):
+        # On force la dimension principale canal/source
+        for dim in ["sessionDefaultChannelGroup", "source", "medium"]:
+            if dim in dimensions:
+                # On met la dimension canal/source en premier
+                dimensions = [dim] + [d for d in dimensions if d != dim]
+                break
+        else:
+            # Si aucune dimension canal/source n'est détectée, on l'ajoute
+            dimensions = ["sessionDefaultChannelGroup"] + dimensions
+    # Ajout dans parse_user_query (avant le return)
+    duration_keywords = ["temps", "durée", "longtemps", "passe le plus de temps", "temps moyen", "durée moyenne"]
+    if any(kw in query for kw in duration_keywords):
+        # On force la métrique averageSessionDuration en priorité
+        if "averageSessionDuration" not in metrics:
+            metrics = ["averageSessionDuration"] + metrics
+        else:
+            # On met averageSessionDuration en premier
+            metrics = [m for m in metrics if m != "averageSessionDuration"]
+            metrics = ["averageSessionDuration"] + metrics
     return {
         "metrics": metrics,
         "dimensions": dimensions,
