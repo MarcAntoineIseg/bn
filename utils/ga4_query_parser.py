@@ -174,9 +174,15 @@ def detect_date_range(query: str) -> dict:
     elif "aujourd'hui" in query or "ce jour" in query:
         return {"start_date": "today", "end_date": "today"}
     elif "mois dernier" in query or "le mois dernier" in query:
-        return {"start_date": "30daysAgo", "end_date": "today"}
+        # Prend le mois précédent complet
+        today = datetime.today()
+        first_day_this_month = today.replace(day=1)
+        last_day_last_month = first_day_this_month - timedelta(days=1)
+        first_day_last_month = last_day_last_month.replace(day=1)
+        return {"start_date": first_day_last_month.strftime('%Y-%m-%d'), "end_date": last_day_last_month.strftime('%Y-%m-%d')}
     elif "année dernière" in query or "l'année dernière" in query:
-        return {"start_date": "365daysAgo", "end_date": "today"}
+        year = datetime.today().year - 1
+        return {"start_date": f"{year}-01-01", "end_date": f"{year}-12-31"}
     
     # Détection des mois spécifiques
     month_patterns = {
