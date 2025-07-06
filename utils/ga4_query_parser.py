@@ -2,8 +2,6 @@ import re
 from datetime import datetime, timedelta
 from utils.ga4_schema import get_all_metrics, get_all_dimensions, is_valid_metric, is_valid_dimension
 from utils.ga4_intents import detect_intent
-import logging
-from dateutil.relativedelta import relativedelta
 
 # Dictionnaire de synonymes/traductions pour metrics et dimensions GA4
 SYNONYMS = {
@@ -100,75 +98,6 @@ GA4_COMPAT = {
     # ... à enrichir pour chaque metric clé
 }
 
-def extract_date_range(query):
-    """
-    Extrait la période demandée dans la question utilisateur.
-    Gère : 'en 2024', 'le mois dernier', 'cette semaine', 'aujourd'hui', etc.
-    Fallback : toute la période GA4.
-    """
-    today = datetime.utcnow().date()
-    # Par défaut : toute la période GA4
-    start_date = "2005-01-01"
-    end_date = today.strftime("%Y-%m-%d")
-    # Année précise
-    match = re.search(r'en (20\d{2})', query)
-    if match:
-        year = int(match.group(1))
-        start_date = f"{year}-01-01"
-        end_date = f"{year}-12-31"
-    elif "le mois dernier" in query:
-        first = today.replace(day=1) - relativedelta(months=1)
-        start_date = first.strftime("%Y-%m-01")
-        end_date = (first + relativedelta(day=31)).strftime("%Y-%m-%d")
-    elif "cette semaine" in query:
-        start_date = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
-        end_date = today.strftime("%Y-%m-%d")
-    elif "aujourd'hui" in query:
-        start_date = end_date = today.strftime("%Y-%m-%d")
-    # ... autres patterns à enrichir
-    return {"start_date": start_date, "end_date": end_date}
-
-# Placeholder pour le LLM fallback
-def fallback_llm(query):
-    logging.info(f"[GA4 MCP] Fallback LLM activé pour la question : {query}")
-    return {
-        "metrics": [],
-        "dimensions": [],
-        "date_range": extract_date_range(query),
-        "filters": {},
-        "limit": None,
-        "suggestion": "Je n'ai pas compris la question, pouvez-vous la reformuler ?"
-    }
-
-def validate_payload(metrics, dimensions, date_range, filters):
-    """
-    Validation stricte du payload pour éviter toute erreur 400 GA4.
-    - Toujours un metric valide (sessions par défaut)
-    - Dimensions compatibles avec la metric principale
-    - Date range non futur
-    - Filtres sur dimensions existantes
-    """
-    all_metrics = get_all_metrics()
-    all_dimensions = get_all_dimensions()
-    # 1. Metric obligatoire et valide
-    if not metrics or metrics[0] not in all_metrics:
-        metrics = ["sessions"]
-    # 2. Dimensions compatibles
-    main_metric = metrics[0]
-    if main_metric in GA4_COMPAT:
-        dimensions = [d for d in dimensions if d in GA4_COMPAT[main_metric]]
-    else:
-        dimensions = []
-    # 3. Date range
-    today = datetime.utcnow().date()
-    if "end_date" in date_range and date_range["end_date"] > today.strftime("%Y-%m-%d"):
-        date_range["end_date"] = today.strftime("%Y-%m-%d")
-    if "start_date" in date_range and date_range["start_date"] > today.strftime("%Y-%m-%d"):
-        date_range["start_date"] = today.strftime("%Y-%m-%d")
-    # 4. Filtres valides
-    filters = {k: v for k, v in filters.items() if k in all_dimensions}
-    return metrics, dimensions, date_range, filters
-
 def parse_user_query(query: str):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
@@ -184,7 +113,6 @@ def parse_user_query(query: str):
     all_metrics = get_all_metrics()
     all_dimensions = get_all_dimensions()
 
-    logging.info(f"[GA4 MCP] Question utilisateur : {query}")
     # 1. Router d'intention (mapping expert)
     intent, config = detect_intent(query)
     if config:
@@ -222,24 +150,13 @@ def parse_user_query(query: str):
         before = list(dimensions)
         dimensions = [d for d in dimensions if d in allowed_dims]
         if before != dimensions:
-            logging.info(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec l'intention {intent}: {before} -> {dimensions}")
+            print(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec l'intention {intent}: {before} -> {dimensions}")
         # Cas particulier : top page unique
         if intent == "page_views" and ("top 1" in query or "page la plus vue" in query or "plus vue" in query):
             metrics = ["screenPageViews"]
             dimensions = ["pagePath"]
             limit = 1
-            logging.info("[GA4 MCP] Forçage mapping pour 'page la plus vue' : screenPageViews + pagePath, limit=1")
-        logging.info(f"[GA4 MCP] Intention détectée : {intent}, metrics={metrics}, dimensions={dimensions}, date_range={date_range}, limit={limit}, filters={filters}")
-        # Nettoyage strict : ne garder que les dimensions compatibles
-        if metrics and metrics[0] in GA4_COMPAT:
-            before = list(dimensions)
-            dimensions = [d for d in dimensions if d in GA4_COMPAT[metrics[0]]]
-            if before != dimensions:
-                logging.info(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec la metric {metrics[0]} : {before} -> {dimensions}")
-        # Ajout automatique de la dimension 'date' si la question parle de mois
-        if any(kw in query for kw in ["par mois", "mois", "mensuel", "mois où", "mois avec", "mois le plus", "mois ayant"]):
-            if "date" not in dimensions:
-                dimensions.append("date")
+            print("[GA4 MCP] Forçage mapping pour 'page la plus vue' : screenPageViews + pagePath, limit=1")
     else:
         # 2. Fallback dynamique (ancien code)
         metrics = []
@@ -283,27 +200,22 @@ def parse_user_query(query: str):
         # Valeur par défaut si aucune metric trouvée
         if not metrics:
             metrics = ["sessions"]
-        # Extraction de la période
-        date_range = extract_date_range(query)
-        # Ajout automatique de la dimension 'date' si la question parle de mois
-        if any(kw in query for kw in ["par mois", "mois", "mensuel", "mois où", "mois avec", "mois le plus", "mois ayant"]):
-            if "date" not in dimensions:
-                dimensions.append("date")
-        # Nettoyage strict : ne garder que les dimensions compatibles
-        if metrics and metrics[0] in GA4_COMPAT:
-            before = list(dimensions)
-            dimensions = [d for d in dimensions if d in GA4_COMPAT[metrics[0]]]
-            if before != dimensions:
-                logging.info(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec la metric {metrics[0]} : {before} -> {dimensions}")
-        if not metrics:
-            logging.warning(f"[GA4 MCP] Aucune metric trouvée, fallback LLM.")
-            return fallback_llm(query)
+        # Nettoyage : pour les questions top pages, ne garder que pagePath
+        if any(kw in query for kw in ["top", "pages", "plus vues", "meilleures pages", "page la plus visitée"]):
+            if "pagePath" in dimensions:
+                dimensions = ["pagePath"]
+    # --- Validation de compatibilité metrics/dimensions ---
+    main_metric = metrics[0] if metrics else None
+    if main_metric and main_metric in GA4_COMPAT:
+        compatible_dims = GA4_COMPAT[main_metric]
+        before = list(dimensions)
+        dimensions = [d for d in dimensions if d in compatible_dims]
+        if before != dimensions:
+            print(f"[GA4 MCP] Dimensions nettoyées pour compatibilité avec {main_metric}: {before} -> {dimensions}")
     # Si la question est trop complexe ou ne matche rien, indiquer qu'un LLM est nécessaire
     if not metrics and not dimensions:
         llm_needed = True
         suggestion = "Je n'ai pas compris la question, peux-tu la reformuler ou préciser ce que tu veux savoir ?"
-    # À la toute fin, AVANT le return :
-    metrics, dimensions, date_range, filters = validate_payload(metrics, dimensions, date_range, filters)
     return {
         "metrics": metrics,
         "dimensions": dimensions,

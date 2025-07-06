@@ -20,8 +20,8 @@ def get_user_tokens(user_id: str):
     return None
     
 def update_user_tokens(user_id: str, new_access_token: str, new_expiry: str):
-    supabase.table("user_ga_connections").update({
+    supabase.table("user_tokens").update({
         "access_token": new_access_token,
         "token_expires_at": new_expiry
-    }).eq("user_id", user_id).execute()
+    }).eq("userId", user_id).execute()
 
