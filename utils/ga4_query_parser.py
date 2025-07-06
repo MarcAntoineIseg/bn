@@ -510,6 +510,11 @@ def parse_user_query(query: str, previous_metrics=None, previous_dimensions=None
     if any(kw in query for kw in ventes_keywords):
         if "ecommercePurchases" not in metrics:
             metrics = ["ecommercePurchases"]
+    # --- Ajout automatique de la dimension 'month' si la question implique une évolution ou une tendance ---
+    evolution_keywords = ["depuis", "évolution", "en baisse", "en hausse", "progression", "tendance", "variation", "par mois", "mensuel"]
+    if any(kw in query for kw in evolution_keywords):
+        if "month" not in dimensions:
+            dimensions.append("month")
     return {
         "metrics": metrics,
         "dimensions": dimensions,
