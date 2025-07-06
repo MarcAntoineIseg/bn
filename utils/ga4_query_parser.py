@@ -119,8 +119,8 @@ def detect_date_range(query: str) -> dict:
     elif "année dernière" in query or "l'année dernière" in query:
         return {"start_date": "365daysAgo", "end_date": "today"}
     
-    # Par défaut : 30 derniers jours
-    return {"start_date": "30daysAgo", "end_date": "today"}
+    # Par défaut : depuis le début de GA4 (14 août 2015)
+    return {"start_date": "2015-08-14", "end_date": "today"}
 
 def parse_user_query(query: str):
     """
@@ -190,6 +190,7 @@ def parse_user_query(query: str):
             if dimension.lower() in query and dimension not in dimensions:
                 dimensions.append(dimension)
         # Détection intelligente de la plage de dates
+        # Si aucune date n'est détectée, utilise depuis le début de GA4 (2015-08-14)
         date_range = detect_date_range(query)
         # Gestion du limit (top N)
         match = re.search(r'top ?(\d+)', query)
