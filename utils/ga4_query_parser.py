@@ -226,6 +226,7 @@ GA4_COMPAT = {
     "averageSessionDuration": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     "conversions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath", "medium"],
     "userConversionRate": ["deviceCategory", "country", "date", "sessionDefaultChannelGroup", "source", "pagePath"],
+    "ecommercePurchases": ["itemName", "itemCategory", "country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
     # ... à enrichir pour chaque metric clé
 }
 
