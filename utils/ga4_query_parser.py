@@ -41,6 +41,12 @@ SYNONYMS = {
     "nombre de visites": "sessions",
     "vente": "ecommercePurchases",
     "ventes": "ecommercePurchases",
+    "produit": "itemName",
+    "produits": "itemName",
+    "plus vendus": "itemName",
+    "plus vendues": "itemName",
+    "meilleurs produits": "itemName",
+    "top produits": "itemName",
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
@@ -142,6 +148,12 @@ SMART_RULES = [
         "keywords": ["jour de la semaine", "meilleurs jours", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"],
         "dimensions": ["dayOfWeekName"],
         "suggestion": "Voici la répartition par jour de la semaine."
+    },
+    {
+        "keywords": ["produit", "produits", "plus vendus", "plus vendues", "meilleurs produits", "top produits"],
+        "metrics": ["ecommercePurchases"],
+        "dimensions": ["itemName"],
+        "suggestion": "Voici le classement des produits les plus vendus."
     },
     # ... à enrichir selon les besoins
 ]
@@ -288,10 +300,11 @@ def validate_metrics_and_dimensions(metrics, dimensions):
     metrics_valid = list(dict.fromkeys(metrics_valid))
     return metrics_valid, dimensions_valid, suggestions
 
-def parse_user_query(query: str):
+def parse_user_query(query: str, previous_metrics=None, previous_dimensions=None):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
     Utilise d'abord le router d'intention (GA4_INTENTS), puis fallback dynamique.
+    Si aucune métrique/dimension n'est détectée dans la question, reprend celles du contexte précédent (si fourni).
     """
     query = query.lower()
     filters = {}
@@ -402,8 +415,13 @@ def parse_user_query(query: str):
         # Suggestion
         suggestion = "Aucune intention explicite détectée, fallback dynamique."
         # Valeur par défaut si aucune metric trouvée
-        if not metrics:
+        if not metrics and previous_metrics:
+            metrics = previous_metrics
+        elif not metrics:
             metrics = ["sessions"]
+        # Valeur par défaut si aucune dimension trouvée
+        if not dimensions and previous_dimensions:
+            dimensions = previous_dimensions
         # Adaptation pour les moyennes
         metrics = adapt_metrics_for_average(query, metrics)
         # Nettoyage : pour les questions top pages, ne garder que pagePath
@@ -485,6 +503,13 @@ def parse_user_query(query: str):
         dimensions = ["dayOfWeekName"]
     if not metrics:
         metrics = ["sessions"]
+    # --- Forçage de la cohérence métier pour les ventes ---
+    ventes_keywords = [
+        "vente", "ventes", "plus vendus", "plus vendues", "meilleurs produits", "top produits", "produit", "produits"
+    ]
+    if any(kw in query for kw in ventes_keywords):
+        if "ecommercePurchases" not in metrics:
+            metrics = ["ecommercePurchases"]
     return {
         "metrics": metrics,
         "dimensions": dimensions,
