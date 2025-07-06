@@ -119,12 +119,9 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
     
     async with httpx.AsyncClient() as client:
         response = await client.post(url, headers=headers, json=body)
-        
-        # Log de la réponse pour debug
         logger.info(f"GA4 Response Status: {response.status_code}")
         if response.status_code != 200:
             logger.error(f"GA4 Response Error: {response.text}")
-        
         response.raise_for_status()
         data = response.json()
     
@@ -154,17 +151,16 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
         }
         if filters:
             total_body["dimensionFilter"] = body["dimensionFilter"]
-        
         logger.info(f"GA4 Total Request Body: {total_body}")
-        
-        total_response = await client.post(url, headers=headers, json=total_body)
-        if total_response.status_code == 200:
-            total_data = total_response.json()
-            total_rows = total_data.get("rows", [])
-            if total_rows:
-                total_result = {}
-                for j, met in enumerate(metric_headers):
-                    total_result[met] = total_rows[0]["metricValues"][j]["value"]
+        async with httpx.AsyncClient() as client:
+            total_response = await client.post(url, headers=headers, json=total_body)
+            if total_response.status_code == 200:
+                total_data = total_response.json()
+                total_rows = total_data.get("rows", [])
+                if total_rows:
+                    total_result = {}
+                    for j, met in enumerate(metric_headers):
+                        total_result[met] = total_rows[0]["metricValues"][j]["value"]
     
     # Retourne les résultats avec le total si disponible
     result = {
