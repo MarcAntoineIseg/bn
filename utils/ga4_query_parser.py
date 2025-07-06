@@ -441,11 +441,7 @@ def parse_user_query(query: str):
     # Ajout dans parse_user_query (avant le return)
     dayofweek_keywords = ["jour de la semaine", "meilleurs jours", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
     if any(kw in query for kw in dayofweek_keywords):
-        if "dayOfWeekName" not in dimensions:
-            dimensions = ["dayOfWeekName"] + dimensions
-        else:
-            dimensions = [d for d in dimensions if d != "dayOfWeekName"]
-            dimensions = ["dayOfWeekName"] + dimensions
+        dimensions = ["dayOfWeekName"]
     return {
         "metrics": metrics,
         "dimensions": dimensions,
