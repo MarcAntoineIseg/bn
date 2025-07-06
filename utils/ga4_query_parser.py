@@ -108,6 +108,12 @@ SYNONYMS = {
 # Recettes intelligentes pour questions fréquentes
 SMART_RULES = [
     {
+        "keywords": ["produit", "produits", "plus vendus", "plus vendues", "meilleurs produits", "top produits"],
+        "metrics": ["ecommercePurchases"],
+        "dimensions": ["itemName"],
+        "suggestion": "Voici le classement des produits les plus vendus."
+    },
+    {
         "keywords": ["catégorie de produit", "catégories de produit", "catégorie produit", "catégories produit", "item category", "product category", "catégorie la plus visitée", "catégories les plus visitées"],
         "metrics": ["sessions"],
         "dimensions": ["itemCategory"],
@@ -176,12 +182,6 @@ SMART_RULES = [
         "keywords": ["jour de la semaine", "meilleurs jours", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"],
         "dimensions": ["dayOfWeekName"],
         "suggestion": "Voici la répartition par jour de la semaine."
-    },
-    {
-        "keywords": ["produit", "produits", "plus vendus", "plus vendues", "meilleurs produits", "top produits"],
-        "metrics": ["ecommercePurchases"],
-        "dimensions": ["itemName"],
-        "suggestion": "Voici le classement des produits les plus vendus."
     },
     {
         "keywords": [
