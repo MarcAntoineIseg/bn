@@ -47,6 +47,13 @@ SYNONYMS = {
     "plus vendues": "itemName",
     "meilleurs produits": "itemName",
     "top produits": "itemName",
+    "purchase": "ecommercePurchases",
+    "purchases": "ecommercePurchases",
+    "achat": "ecommercePurchases",
+    "achats": "ecommercePurchases",
+    "purchase revenue": "purchaseRevenue",
+    "revenu d'achat": "purchaseRevenue",
+    "convertissent": "conversions",
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
@@ -154,6 +161,14 @@ SMART_RULES = [
         "metrics": ["ecommercePurchases"],
         "dimensions": ["itemName"],
         "suggestion": "Voici le classement des produits les plus vendus."
+    },
+    {
+        "keywords": [
+            "convertissent le mieux", "meilleure conversion", "plus de conversions", "plus d'achats", "plus de purchase", "plus de ventes"
+        ],
+        "metrics": ["conversions"],
+        "dimensions": ["pagePath"],
+        "suggestion": "Voici les pages qui convertissent le mieux."
     },
     # ... à enrichir selon les besoins
 ]
