@@ -39,6 +39,8 @@ SYNONYMS = {
     "visite": "sessions",
     "visites": "sessions",
     "nombre de visites": "sessions",
+    "vente": "ecommercePurchases",
+    "ventes": "ecommercePurchases",
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
@@ -186,26 +188,42 @@ def detect_date_range(query: str) -> dict:
     elif "année dernière" in query or "l'année dernière" in query:
         year = datetime.today().year - 1
         return {"start_date": f"{year}-01-01", "end_date": f"{year}-12-31"}
-    
-    # Détection des mois spécifiques
+
+    # Détection des mois spécifiques (ex: "au mois de juin 2025", "en juin 2025", "pour juin 2025")
     month_patterns = {
         "janvier": "01", "février": "02", "mars": "03", "avril": "04",
         "mai": "05", "juin": "06", "juillet": "07", "août": "08",
         "septembre": "09", "octobre": "10", "novembre": "11", "décembre": "12"
     }
-    
-    current_year = datetime.now().year
+    # Recherche du type "(au|en|pour|du|le) mois de <mois> <année>" ou "<mois> <année>"
+    for month_name, month_num in month_patterns.items():
+        # Ex: "au mois de juin 2025", "en juin 2025", "pour juin 2025", "juin 2025"
+        match = re.search(rf"(?:au mois de|en|pour|du|le)? ?{month_name} (\d{{4}})", query)
+        if match:
+            year = int(match.group(1))
+            start_date = f"{year}-{month_num}-01"
+            # Calcul du dernier jour du mois
+            last_day = calendar.monthrange(year, int(month_num))[1]
+            end_date = f"{year}-{month_num}-{last_day:02d}"
+            return {"start_date": start_date, "end_date": end_date}
+        # Ex: "au mois de juin", "en juin", "pour juin" (année courante)
+        match2 = re.search(rf"(?:au mois de|en|pour|du|le)? ?{month_name}(?! \d)", query)
+        if match2:
+            year = datetime.now().year
+            start_date = f"{year}-{month_num}-01"
+            last_day = calendar.monthrange(year, int(month_num))[1]
+            end_date = f"{year}-{month_num}-{last_day:02d}"
+            return {"start_date": start_date, "end_date": end_date}
     # Règle spéciale : 'depuis [mois]'
     for month_name, month_num in month_patterns.items():
         match = re.search(r'depuis ' + month_name + r'( \d{4})?', query)
         if match:
             # Cherche l'année dans la question
             year_match = re.search(r'(\d{4})', query)
-            year = int(year_match.group(1)) if year_match else current_year
+            year = int(year_match.group(1)) if year_match else datetime.now().year
             start_date = f"{year}-{month_num}-01"
             end_date = datetime.today().strftime('%Y-%m-%d')
             return {"start_date": start_date, "end_date": end_date}
-    
     # Détection "X derniers mois"
     match = re.search(r'(\d+) derniers mois', query)
     if match:
@@ -218,7 +236,6 @@ def detect_date_range(query: str) -> dict:
         start_date = first_month.strftime('%Y-%m-%d')
         end_date = today.strftime('%Y-%m-%d')
         return {"start_date": start_date, "end_date": end_date}
-    
     # Par défaut : depuis le début de GA4 (14 août 2015)
     return {"start_date": "2015-08-14", "end_date": "today"}
 
@@ -285,12 +302,31 @@ def parse_user_query(query: str):
     all_metrics = get_all_metrics()
     all_dimensions = get_all_dimensions()
 
+    # --- Détection explicite de ratio 'X par Y' ---
+    ratio_match = re.search(r"([\w\s]+) par ([\w\s]+)", query)
+    ratio_metrics = []
+    if ratio_match:
+        left = ratio_match.group(1).strip()
+        right = ratio_match.group(2).strip()
+        # On mappe chaque côté via SYNONYMS ou all_metrics
+        for word in [left, right]:
+            for syn, ga4_name in SYNONYMS.items():
+                if word in syn and ga4_name in all_metrics and ga4_name not in ratio_metrics:
+                    ratio_metrics.append(ga4_name)
+            for metric in all_metrics:
+                if word == metric.lower() and metric not in ratio_metrics:
+                    ratio_metrics.append(metric)
     # 1. Router d'intention (mapping expert)
     intent, config = detect_intent(query)
     if config:
         metrics = list(config["metrics"])
         # Adaptation pour les moyennes
         metrics = adapt_metrics_for_average(query, metrics)
+        # Ajout des metrics détectées par ratio si besoin
+        if ratio_metrics:
+            for m in ratio_metrics:
+                if m not in metrics:
+                    metrics.append(m)
         # Dimensions : si la question précise une dimension compatible, on la garde, sinon on prend la principale
         dimensions = []
         for d in config["dimensions"]:
@@ -338,6 +374,11 @@ def parse_user_query(query: str):
         for dimension in all_dimensions:
             if dimension.lower() in query and dimension not in dimensions:
                 dimensions.append(dimension)
+        # Ajout des metrics détectées par ratio si besoin
+        if ratio_metrics:
+            for m in ratio_metrics:
+                if m not in metrics:
+                    metrics.append(m)
         # Détection intelligente de la plage de dates
         # Si aucune date n'est détectée, utilise depuis le début de GA4 (2015-08-14)
         date_range = detect_date_range(query)
@@ -363,10 +404,8 @@ def parse_user_query(query: str):
         # Valeur par défaut si aucune metric trouvée
         if not metrics:
             metrics = ["sessions"]
-        
         # Adaptation pour les moyennes
         metrics = adapt_metrics_for_average(query, metrics)
-        
         # Nettoyage : pour les questions top pages, ne garder que pagePath
         if any(kw in query for kw in ["top", "pages", "plus vues", "meilleures pages", "page la plus visitée"]):
             if "pagePath" in dimensions:
