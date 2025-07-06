@@ -417,6 +417,10 @@ def parse_user_query(query: str, previous_metrics=None, previous_dimensions=None
             if any(kw in query for kw in keywords):
                 if dim not in dimensions:
                     dimensions.append(dim)
+        # Ajout de toute dimension explicitement mentionnée dans la question (par mot-clé ou nom exact)
+        for dim in all_dimensions:
+            if dim.lower() in query and dim not in dimensions:
+                dimensions.append(dim)
     else:
         # 2. Fallback dynamique (ancien code)
         metrics = []
@@ -477,6 +481,10 @@ def parse_user_query(query: str, previous_metrics=None, previous_dimensions=None
         if any(kw in query for kw in ["top", "pages", "plus vues", "meilleures pages", "page la plus visitée"]):
             if "pagePath" in dimensions:
                 dimensions = ["pagePath"]
+        # Ajout de toute dimension explicitement mentionnée dans la question (par mot-clé ou nom exact)
+        for dim in all_dimensions:
+            if dim.lower() in query and dim not in dimensions:
+                dimensions.append(dim)
     # --- Validation de compatibilité metrics/dimensions ---
     main_metric = metrics[0] if metrics else None
     if main_metric and main_metric in GA4_COMPAT:
