@@ -36,6 +36,9 @@ SYNONYMS = {
     "conversion rate": "userConversionRate",
     "mobile vs desktop": "deviceCategory",
     "desktop vs mobile": "deviceCategory",
+    "visite": "sessions",
+    "visites": "sessions",
+    "nombre de visites": "sessions",
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
@@ -442,6 +445,8 @@ def parse_user_query(query: str):
     dayofweek_keywords = ["jour de la semaine", "meilleurs jours", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
     if any(kw in query for kw in dayofweek_keywords):
         dimensions = ["dayOfWeekName"]
+    if not metrics:
+        metrics = ["sessions"]
     return {
         "metrics": metrics,
         "dimensions": dimensions,
