@@ -57,9 +57,16 @@ SYNONYMS = {
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
-    "country": "country",
+    "localisation": "country",
+    "région": "region",
+    "régions": "region",
+    "continent": "continent",
+    "continents": "continent",
     "ville": "city",
+    "villes": "city",
     "city": "city",
+    "cities": "city",
+    "localisation urbaine": "city",
     "source": "source",
     "sources": "source",
     "canal": "sessionDefaultChannelGroup",
@@ -169,6 +176,22 @@ SMART_RULES = [
         "metrics": ["conversions"],
         "dimensions": ["pagePath"],
         "suggestion": "Voici les pages qui convertissent le mieux."
+    },
+    {
+        "keywords": [
+            "pays", "pays d'origine", "localisation", "région", "régions", "continent", "continents", "zone géographique", "provenance géographique", "origine géographique"
+        ],
+        "metrics": ["totalUsers"],
+        "dimensions": ["country"],
+        "suggestion": "Voici la répartition des utilisateurs par pays."
+    },
+    {
+        "keywords": [
+            "ville", "villes", "city", "cities", "localisation urbaine", "provenance urbaine", "origine urbaine"
+        ],
+        "metrics": ["totalUsers"],
+        "dimensions": ["city"],
+        "suggestion": "Voici la répartition des utilisateurs par ville."
     },
     # ... à enrichir selon les besoins
 ]
