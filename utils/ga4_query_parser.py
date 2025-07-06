@@ -94,6 +94,14 @@ SYNONYMS = {
     "vendredi": "dayOfWeekName",
     "samedi": "dayOfWeekName",
     "dimanche": "dayOfWeekName",
+    "catégorie de produit": "itemCategory",
+    "catégories de produit": "itemCategory",
+    "catégorie produit": "itemCategory",
+    "catégories produit": "itemCategory",
+    "item category": "itemCategory",
+    "product category": "itemCategory",
+    "itemcategory": "itemCategory",
+    "productcategory": "itemCategory",
     # ... à enrichir selon les besoins
 }
 
@@ -193,12 +201,18 @@ SMART_RULES = [
         "dimensions": ["city"],
         "suggestion": "Voici la répartition des utilisateurs par ville."
     },
+    {
+        "keywords": ["catégorie de produit", "catégories de produit", "catégorie produit", "catégories produit", "item category", "product category", "catégorie la plus visitée", "catégories les plus visitées"],
+        "metrics": ["screenPageViews"],
+        "dimensions": ["itemCategory"],
+        "suggestion": "Voici la catégorie de produit la plus visitée."
+    },
     # ... à enrichir selon les besoins
 ]
 
 # Mapping minimal de compatibilité metrics/dimensions GA4 (à enrichir selon la doc officielle)
 GA4_COMPAT = {
-    "screenPageViews": ["pagePath", "pageTitle", "country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
+    "screenPageViews": ["pagePath", "pageTitle", "country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "itemCategory"],
     "sessions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath", "dayOfWeekName"],
     "totalUsers": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     "activeUsers": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
