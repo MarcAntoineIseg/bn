@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timedelta
 from utils.ga4_schema import get_all_metrics, get_all_dimensions, is_valid_metric, is_valid_dimension
 from utils.ga4_intents import detect_intent
+import calendar
 
 # Dictionnaire de synonymes/traductions pour metrics et dimensions GA4
 SYNONYMS = {
@@ -142,10 +143,12 @@ def detect_date_range(query: str) -> dict:
         if month_name in query:
             # Cherche l'année dans la question
             year_match = re.search(r'(\d{4})', query)
-            year = year_match.group(1) if year_match else str(current_year)
+            year = int(year_match.group(1)) if year_match else current_year
+            # Trouve le dernier jour du mois
+            last_day = calendar.monthrange(year, int(month_num))[1]
             return {
                 "start_date": f"{year}-{month_num}-01",
-                "end_date": f"{year}-{month_num}-31"
+                "end_date": f"{year}-{month_num}-{last_day:02d}"
             }
     
     # Par défaut : depuis le début de GA4 (14 août 2015)
