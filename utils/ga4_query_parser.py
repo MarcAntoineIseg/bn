@@ -102,10 +102,11 @@ SMART_RULES = [
 # Mapping minimal de compatibilité metrics/dimensions GA4 (à enrichir selon la doc officielle)
 GA4_COMPAT = {
     "screenPageViews": ["pagePath", "pageTitle", "country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
-    "sessions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
-    "totalUsers": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
-    "bounceRate": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
-    "averageSessionDuration": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
+    "sessions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
+    "totalUsers": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
+    "bounceRate": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
+    "averageSessionDuration": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
+    "conversions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     # ... à enrichir pour chaque metric clé
 }
 
@@ -180,6 +181,34 @@ def adapt_metrics_for_average(query: str, metrics: list) -> list:
         return list(dict.fromkeys(adapted_metrics))
     
     return metrics
+
+def validate_metrics_and_dimensions(metrics, dimensions):
+    """
+    Pour chaque métrique, ne garde que les dimensions compatibles. Si aucune dimension n'est compatible, fallback sur la dimension principale de la métrique.
+    Retourne (metrics_valid, dimensions_valid, suggestions)
+    """
+    suggestions = []
+    metrics_valid = []
+    dimensions_valid = []
+    for metric in metrics:
+        if metric in GA4_COMPAT:
+            dims_ok = [d for d in dimensions if d in GA4_COMPAT[metric]]
+            if dims_ok:
+                metrics_valid.append(metric)
+                dimensions_valid += dims_ok
+            else:
+                # Fallback sur la dimension principale de la métrique
+                main_dim = GA4_COMPAT[metric][0]
+                metrics_valid.append(metric)
+                dimensions_valid.append(main_dim)
+                suggestions.append(f"La dimension demandée n'est pas compatible avec {metric}, fallback sur {main_dim}.")
+        else:
+            # Si la métrique n'est pas dans le mapping, on la garde sans validation
+            metrics_valid.append(metric)
+    # Nettoyage doublons
+    dimensions_valid = list(dict.fromkeys(dimensions_valid))
+    metrics_valid = list(dict.fromkeys(metrics_valid))
+    return metrics_valid, dimensions_valid, suggestions
 
 def parse_user_query(query: str):
     """
@@ -296,6 +325,8 @@ def parse_user_query(query: str):
     if not metrics and not dimensions:
         llm_needed = True
         suggestion = "Je n'ai pas compris la question, peux-tu la reformuler ou préciser ce que tu veux savoir ?"
+    metrics, dimensions, suggestions = validate_metrics_and_dimensions(metrics, dimensions)
+    if suggestions: suggestion = (suggestion or "") + " " + " ".join(suggestions)
     return {
         "metrics": metrics,
         "dimensions": dimensions,
