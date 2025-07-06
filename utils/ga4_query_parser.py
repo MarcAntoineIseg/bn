@@ -109,9 +109,9 @@ SYNONYMS = {
 SMART_RULES = [
     {
         "keywords": ["catégorie de produit", "catégories de produit", "catégorie produit", "catégories produit", "item category", "product category", "catégorie la plus visitée", "catégories les plus visitées"],
-        "metrics": ["screenPageViews"],
+        "metrics": ["sessions"],
         "dimensions": ["itemCategory"],
-        "suggestion": "Voici la catégorie de produit la plus visitée."
+        "suggestion": "Voici la catégorie de produit la plus consultée (sessions)."
     },
     {
         "keywords": ["âge", "age", "moyenne d'âge", "âge moyen"],
