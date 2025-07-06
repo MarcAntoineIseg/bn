@@ -95,7 +95,7 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
     # Requête principale avec dimensions
     body = {
         "dateRanges": [{
-            "startDate": date_range.get("start_date", "30daysAgo"),
+            "startDate": date_range.get("start_date", "2015-08-14"),
             "endDate": date_range.get("end_date", "today")
         }],
         "metrics": [{"name": m} for m in metrics],
@@ -144,7 +144,7 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
         # Requête pour le total (sans dimensions)
         total_body = {
             "dateRanges": [{
-                "startDate": date_range.get("start_date", "30daysAgo"),
+                "startDate": date_range.get("start_date", "2015-08-14"),
                 "endDate": date_range.get("end_date", "today")
             }],
             "metrics": [{"name": m} for m in metrics]

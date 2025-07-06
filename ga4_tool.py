@@ -36,7 +36,7 @@ async def get_ga4_report(
         return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
 
     try:
-        default_date_range = {"start_date": "30daysAgo", "end_date": "today"}
+        default_date_range = {"start_date": "2015-08-14", "end_date": "today"}
         result = await run_dynamic_report(
             tokens["access_token"],
             ga4PropertyId,
