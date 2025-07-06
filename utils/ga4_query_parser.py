@@ -214,7 +214,7 @@ SMART_RULES = [
         "suggestion": "Voici la catégorie de produit la plus visitée."
     },
     # ... à enrichir selon les besoins
-}
+]
 
 # Mapping minimal de compatibilité metrics/dimensions GA4 (à enrichir selon la doc officielle)
 GA4_COMPAT = {
