@@ -406,6 +406,17 @@ def parse_user_query(query: str, previous_metrics=None, previous_dimensions=None
             filters["deviceCategory"] = "desktop"
         # Suggestion
         suggestion = f"Intent détecté : {intent}."
+        # Forçage de la dimension géographique si la question contient un mot-clé de localisation
+        geo_keywords = {
+            "country": ["pays", "pays d'origine", "localisation", "zone géographique", "provenance géographique", "origine géographique"],
+            "city": ["ville", "villes", "city", "cities", "localisation urbaine", "provenance urbaine", "origine urbaine"],
+            "region": ["région", "régions"],
+            "continent": ["continent", "continents"]
+        }
+        for dim, keywords in geo_keywords.items():
+            if any(kw in query for kw in keywords):
+                if dim not in dimensions:
+                    dimensions.append(dim)
     else:
         # 2. Fallback dynamique (ancien code)
         metrics = []
@@ -422,9 +433,9 @@ def parse_user_query(query: str, previous_metrics=None, previous_dimensions=None
             if metric.lower() in query and metric not in metrics:
                 metrics.append(metric)
         # Matching dynamique sur les dimensions
-        for dimension in all_dimensions:
-            if dimension.lower() in query and dimension not in dimensions:
-                dimensions.append(dimension)
+        for dim in all_dimensions:
+            if dim.lower() in query and dim not in dimensions:
+                dimensions.append(dim)
         # Ajout des metrics détectées par ratio si besoin
         if ratio_metrics:
             for m in ratio_metrics:
