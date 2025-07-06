@@ -96,13 +96,27 @@ async def ask_ga4_report(
                 filters,
                 limit
             )
-            return {
-                "message": f"Résultat pour la question : {question}",
-                "params": params,
-                "data": result,
-                "suggestion": suggestion,
-                "llm_needed": llm_needed
-            }
+            
+            # Gestion de la nouvelle structure de réponse
+            if isinstance(result, dict) and "detailed_data" in result:
+                # Nouvelle structure avec total et données détaillées
+                return {
+                    "message": f"Résultat pour la question : {question}",
+                    "params": params,
+                    "total": result.get("total"),
+                    "detailed_data": result.get("detailed_data", []),
+                    "suggestion": suggestion,
+                    "llm_needed": llm_needed
+                }
+            else:
+                # Ancienne structure (compatibilité)
+                return {
+                    "message": f"Résultat pour la question : {question}",
+                    "params": params,
+                    "data": result,
+                    "suggestion": suggestion,
+                    "llm_needed": llm_needed
+                }
         except Exception as e:
             logger.error(f"GA4 API Error: {str(e)}")
             return {"error": f"Erreur GA4: {str(e)}"}

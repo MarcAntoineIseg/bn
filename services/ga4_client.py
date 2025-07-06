@@ -88,6 +88,11 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
     headers = {
         "Authorization": f"Bearer {access_token}"
     }
+    
+    # Si on a des dimensions (ex: date), on fait aussi une requête pour le total
+    include_total = len(dimensions) > 0
+    
+    # Requête principale avec dimensions
     body = {
         "dateRanges": [{
             "startDate": date_range.get("start_date", "30daysAgo"),
@@ -122,18 +127,51 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
         
         response.raise_for_status()
         data = response.json()
-    # Extraction des résultats
+    
+    # Extraction des résultats détaillés
     rows = data.get("rows", [])
     dimension_headers = [d["name"] for d in data.get("dimensionHeaders", [])]
     metric_headers = [m["name"] for m in data.get("metricHeaders", [])]
-    result = []
+    detailed_result = []
     for row in rows:
         entry = {}
         for i, dim in enumerate(dimension_headers):
             entry[dim] = row["dimensionValues"][i]["value"]
         for j, met in enumerate(metric_headers):
             entry[met] = row["metricValues"][j]["value"]
-        result.append(entry)
+        detailed_result.append(entry)
+    
+    # Si on a des dimensions, on récupère aussi le total
+    total_result = None
+    if include_total:
+        # Requête pour le total (sans dimensions)
+        total_body = {
+            "dateRanges": [{
+                "startDate": date_range.get("start_date", "30daysAgo"),
+                "endDate": date_range.get("end_date", "today")
+            }],
+            "metrics": [{"name": m} for m in metrics]
+        }
+        if filters:
+            total_body["dimensionFilter"] = body["dimensionFilter"]
+        
+        logger.info(f"GA4 Total Request Body: {total_body}")
+        
+        total_response = await client.post(url, headers=headers, json=total_body)
+        if total_response.status_code == 200:
+            total_data = total_response.json()
+            total_rows = total_data.get("rows", [])
+            if total_rows:
+                total_result = {}
+                for j, met in enumerate(metric_headers):
+                    total_result[met] = total_rows[0]["metricValues"][j]["value"]
+    
+    # Retourne les résultats avec le total si disponible
+    result = {
+        "detailed_data": detailed_result,
+        "total": total_result
+    }
+    
     return result
 
 
