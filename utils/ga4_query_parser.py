@@ -60,6 +60,15 @@ SYNONYMS = {
     "origine": "source",
     "acquisition": "sessionDefaultChannelGroup",
     "medium": "medium",
+    "jour de la semaine": "dayOfWeekName",
+    "meilleurs jours": "dayOfWeekName",
+    "lundi": "dayOfWeekName",
+    "mardi": "dayOfWeekName",
+    "mercredi": "dayOfWeekName",
+    "jeudi": "dayOfWeekName",
+    "vendredi": "dayOfWeekName",
+    "samedi": "dayOfWeekName",
+    "dimanche": "dayOfWeekName",
     # ... à enrichir selon les besoins
 }
 
@@ -124,13 +133,18 @@ SMART_RULES = [
         "dimensions": ["deviceCategory"],
         "suggestion": "Voici le taux de conversion par device (mobile vs desktop)."
     },
+    {
+        "keywords": ["jour de la semaine", "meilleurs jours", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"],
+        "dimensions": ["dayOfWeekName"],
+        "suggestion": "Voici la répartition par jour de la semaine."
+    },
     # ... à enrichir selon les besoins
 ]
 
 # Mapping minimal de compatibilité metrics/dimensions GA4 (à enrichir selon la doc officielle)
 GA4_COMPAT = {
     "screenPageViews": ["pagePath", "pageTitle", "country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source"],
-    "sessions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
+    "sessions": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath", "dayOfWeekName"],
     "totalUsers": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     "bounceRate": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
     "averageSessionDuration": ["country", "date", "deviceCategory", "sessionDefaultChannelGroup", "source", "pagePath"],
@@ -421,6 +435,14 @@ def parse_user_query(query: str):
         # On retire tout filtre sur deviceCategory pour permettre la comparaison
         if "deviceCategory" in filters:
             del filters["deviceCategory"]
+    # Ajout dans parse_user_query (avant le return)
+    dayofweek_keywords = ["jour de la semaine", "meilleurs jours", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+    if any(kw in query for kw in dayofweek_keywords):
+        if "dayOfWeekName" not in dimensions:
+            dimensions = ["dayOfWeekName"] + dimensions
+        else:
+            dimensions = [d for d in dimensions if d != "dayOfWeekName"]
+            dimensions = ["dayOfWeekName"] + dimensions
     return {
         "metrics": metrics,
         "dimensions": dimensions,
