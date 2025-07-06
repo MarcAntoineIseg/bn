@@ -23,6 +23,10 @@ SYNONYMS = {
     "rebond": "bounceRate",
     "durée moyenne": "averageSessionDuration",
     "temps moyen": "averageSessionDuration",
+    "moyenne": "average",
+    "moyen": "average",
+    "en moyenne": "average",
+    "moyennement": "average",
     # Dimensions
     "pays": "country",
     "pays d'origine": "country",
@@ -85,6 +89,12 @@ SMART_RULES = [
         "dimensions": ["pagePath"],
         "suggestion": "Voici le classement des pages les plus vues."
     },
+    {
+        "keywords": ["moyenne", "moyen", "en moyenne", "moyennement", "average"],
+        "metrics": ["sessions", "averageSessionDuration"],
+        "dimensions": ["date"],
+        "suggestion": "Voici les données avec les moyennes calculées."
+    },
     # ... à enrichir selon les besoins
 ]
 
@@ -119,8 +129,54 @@ def detect_date_range(query: str) -> dict:
     elif "année dernière" in query or "l'année dernière" in query:
         return {"start_date": "365daysAgo", "end_date": "today"}
     
+    # Détection des mois spécifiques
+    import re
+    month_patterns = {
+        "janvier": "01", "février": "02", "mars": "03", "avril": "04",
+        "mai": "05", "juin": "06", "juillet": "07", "août": "08",
+        "septembre": "09", "octobre": "10", "novembre": "11", "décembre": "12"
+    }
+    
+    current_year = datetime.now().year
+    for month_name, month_num in month_patterns.items():
+        if month_name in query:
+            # Cherche l'année dans la question
+            year_match = re.search(r'(\d{4})', query)
+            year = year_match.group(1) if year_match else str(current_year)
+            return {
+                "start_date": f"{year}-{month_num}-01",
+                "end_date": f"{year}-{month_num}-31"
+            }
+    
     # Par défaut : depuis le début de GA4 (14 août 2015)
     return {"start_date": "2015-08-14", "end_date": "today"}
+
+def adapt_metrics_for_average(query: str, metrics: list) -> list:
+    """
+    Adapte les métriques pour calculer des moyennes quand demandé.
+    """
+    query = query.lower()
+    average_keywords = ["moyenne", "moyen", "en moyenne", "moyennement", "average"]
+    
+    if any(keyword in query for keyword in average_keywords):
+        adapted_metrics = []
+        for metric in metrics:
+            if metric == "sessions":
+                # Pour les sessions, on garde sessions mais on ajoute averageSessionDuration
+                adapted_metrics.extend(["sessions", "averageSessionDuration"])
+            elif metric == "totalUsers":
+                # Pour les utilisateurs, on garde totalUsers et on ajoute averageSessionDuration
+                adapted_metrics.extend(["totalUsers", "averageSessionDuration"])
+            elif metric == "screenPageViews":
+                # Pour les pages vues, on garde screenPageViews et on ajoute averageSessionDuration
+                adapted_metrics.extend(["screenPageViews", "averageSessionDuration"])
+            else:
+                adapted_metrics.append(metric)
+        
+        # Supprimer les doublons
+        return list(dict.fromkeys(adapted_metrics))
+    
+    return metrics
 
 def parse_user_query(query: str):
     """
@@ -140,6 +196,9 @@ def parse_user_query(query: str):
     intent, config = detect_intent(query)
     if config:
         metrics = list(config["metrics"])
+        # Adaptation pour les moyennes
+        metrics = adapt_metrics_for_average(query, metrics)
+        
         # Dimensions : si la question précise une dimension compatible, on la garde, sinon on prend la principale
         dimensions = []
         for d in config["dimensions"]:
@@ -214,6 +273,10 @@ def parse_user_query(query: str):
         # Valeur par défaut si aucune metric trouvée
         if not metrics:
             metrics = ["sessions"]
+        
+        # Adaptation pour les moyennes
+        metrics = adapt_metrics_for_average(query, metrics)
+        
         # Nettoyage : pour les questions top pages, ne garder que pagePath
         if any(kw in query for kw in ["top", "pages", "plus vues", "meilleures pages", "page la plus visitée"]):
             if "pagePath" in dimensions:
