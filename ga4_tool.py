@@ -59,51 +59,59 @@ async def ask_ga4_report(
     """
     Analyse la question utilisateur, déduit metrics/dimensions/date_range/filters, exécute la requête GA4 et retourne la réponse.
     """
-    if not userId or not ga4PropertyId or not question:
-        return {"error": "userId, ga4PropertyId et question sont obligatoires"}
-
-    # 1. Analyse la question
-    logger.info(f"Analyzing question: {question}")
-    params = parse_user_query(question)
-    logger.info(f"Parsed params: {params}")
-    
-    metrics = params["metrics"]
-    dimensions = params["dimensions"]
-    date_range = params["date_range"]
-    filters = params["filters"]
-    suggestion = params.get("suggestion")
-    limit = params.get("limit") or 100
-    llm_needed = params.get("llm_needed", False)
-
-    # 2. Récupère les tokens utilisateur
-    tokens = get_user_tokens(userId)
-    if not tokens:
-        return {"error": f"Aucun token trouvé pour l'utilisateur {userId}"}
     try:
-        tokens = await check_and_refresh_token(userId, tokens)
-    except Exception as e:
-        return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
+        if not userId or not ga4PropertyId or not question:
+            return {"error": "userId, ga4PropertyId et question sont obligatoires"}
 
-    # 3. Appelle GA4 dynamiquement
-    try:
-        result = await run_dynamic_report(
-            tokens["access_token"],
-            ga4PropertyId,
-            metrics,
-            dimensions,
-            date_range,
-            filters,
-            limit
-        )
-        return {
-            "message": f"Résultat pour la question : {question}",
-            "params": params,
-            "data": result,
-            "suggestion": suggestion,
-            "llm_needed": llm_needed
-        }
+        # 1. Analyse la question
+        logger.info(f"Analyzing question: {question}")
+        params = parse_user_query(question)
+        logger.info(f"Parsed params: {params}")
+        
+        metrics = params["metrics"]
+        dimensions = params["dimensions"]
+        date_range = params["date_range"]
+        filters = params["filters"]
+        suggestion = params.get("suggestion")
+        limit = params.get("limit") or 100
+        llm_needed = params.get("llm_needed", False)
+
+        # 2. Récupère les tokens utilisateur
+        tokens = get_user_tokens(userId)
+        if not tokens:
+            return {"error": f"Aucun token trouvé pour l'utilisateur {userId}"}
+        try:
+            tokens = await check_and_refresh_token(userId, tokens)
+        except Exception as e:
+            return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
+
+        # 3. Appelle GA4 dynamiquement
+        try:
+            result = await run_dynamic_report(
+                tokens["access_token"],
+                ga4PropertyId,
+                metrics,
+                dimensions,
+                date_range,
+                filters,
+                limit
+            )
+            return {
+                "message": f"Résultat pour la question : {question}",
+                "params": params,
+                "data": result,
+                "suggestion": suggestion,
+                "llm_needed": llm_needed
+            }
+        except Exception as e:
+            logger.error(f"GA4 API Error: {str(e)}")
+            return {"error": f"Erreur GA4: {str(e)}"}
+            
     except Exception as e:
-        return {"error": f"Erreur GA4: {str(e)}"}
+        import traceback
+        logger.error(f"Unexpected error in ask_ga4_report: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {"error": f"Erreur inattendue: {str(e)}"}
 
 if __name__ == "__main__":
     mcp.run(transport="sse")

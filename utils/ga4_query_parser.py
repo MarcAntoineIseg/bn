@@ -98,6 +98,30 @@ GA4_COMPAT = {
     # ... à enrichir pour chaque metric clé
 }
 
+def detect_date_range(query: str) -> dict:
+    """
+    Détecte la plage de dates dans la question utilisateur.
+    Retourne un dict avec start_date et end_date.
+    """
+    query = query.lower()
+    
+    # Détection des plages relatives
+    if "30 derniers jours" in query or "30 jours" in query:
+        return {"start_date": "30daysAgo", "end_date": "today"}
+    elif "7 derniers jours" in query or "semaine dernière" in query or "cette semaine" in query:
+        return {"start_date": "7daysAgo", "end_date": "today"}
+    elif "hier" in query:
+        return {"start_date": "yesterday", "end_date": "yesterday"}
+    elif "aujourd'hui" in query or "ce jour" in query:
+        return {"start_date": "today", "end_date": "today"}
+    elif "mois dernier" in query or "le mois dernier" in query:
+        return {"start_date": "30daysAgo", "end_date": "today"}
+    elif "année dernière" in query or "l'année dernière" in query:
+        return {"start_date": "365daysAgo", "end_date": "today"}
+    
+    # Par défaut : 30 derniers jours
+    return {"start_date": "30daysAgo", "end_date": "today"}
+
 def parse_user_query(query: str):
     """
     Parse une question utilisateur pour extraire metrics, dimensions, date_range, filters, limit, suggestion, llm_needed.
@@ -124,7 +148,9 @@ def parse_user_query(query: str):
         if not dimensions:
             # fallback : dimension principale (ex : pagePath pour page views)
             dimensions = [config["dimensions"][0]]
-        date_range = dict(config["default_time_range"])
+        # Détection intelligente de la plage de dates
+        detected_range = detect_date_range(query)
+        date_range = detected_range if detected_range != {"start_date": "30daysAgo", "end_date": "today"} else dict(config["default_time_range"])
         # Gestion du limit (top N)
         match = re.search(r'top ?(\d+)', query)
         if match:
@@ -163,8 +189,8 @@ def parse_user_query(query: str):
         for dimension in all_dimensions:
             if dimension.lower() in query and dimension not in dimensions:
                 dimensions.append(dimension)
-        # Par défaut : toute la période GA4
-        date_range = {"start_date": "2005-01-01", "end_date": "today"}
+        # Détection intelligente de la plage de dates
+        date_range = detect_date_range(query)
         # Gestion du limit (top N)
         match = re.search(r'top ?(\d+)', query)
         if match:
