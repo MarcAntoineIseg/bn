@@ -108,6 +108,12 @@ SYNONYMS = {
 # Recettes intelligentes pour questions fréquentes
 SMART_RULES = [
     {
+        "keywords": ["catégorie de produit", "catégories de produit", "catégorie produit", "catégories produit", "item category", "product category", "catégorie la plus visitée", "catégories les plus visitées"],
+        "metrics": ["screenPageViews"],
+        "dimensions": ["itemCategory"],
+        "suggestion": "Voici la catégorie de produit la plus visitée."
+    },
+    {
         "keywords": ["âge", "age", "moyenne d'âge", "âge moyen"],
         "dimensions": ["userAgeBracket"],
         "suggestion": "La moyenne d'âge n'est pas disponible, mais voici la répartition par tranche d'âge."
@@ -208,7 +214,7 @@ SMART_RULES = [
         "suggestion": "Voici la catégorie de produit la plus visitée."
     },
     # ... à enrichir selon les besoins
-]
+}
 
 # Mapping minimal de compatibilité metrics/dimensions GA4 (à enrichir selon la doc officielle)
 GA4_COMPAT = {
