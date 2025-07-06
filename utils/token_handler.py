@@ -44,7 +44,7 @@ async def check_and_refresh_token(user_id: str, tokens: dict):
         new_expiry = (now + datetime.timedelta(seconds=new_token_data["expires_in"])).isoformat()
         
         # Update Supabase
-        #update_user_tokens(user_id, new_token_data["access_token"], new_expiry)
+        update_user_tokens(user_id, new_token_data["access_token"], new_expiry)
 
         # Return updated token set
         tokens["access_token"] = new_token_data["access_token"]
