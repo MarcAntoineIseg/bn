@@ -3,6 +3,11 @@ from services.supabase_client import get_user_tokens
 from services.ga4_client import run_dynamic_report
 from utils.token_handler import check_and_refresh_token
 from utils.ga4_query_parser import parse_user_query
+import logging
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 mcp = FastMCP("GA4DynamicTool", host="0.0.0.0", port=8000, debug=True)
 
@@ -31,12 +36,13 @@ async def get_ga4_report(
         return {"error": f"Erreur lors du rafraîchissement du token: {str(e)}"}
 
     try:
+        default_date_range = {"start_date": "30daysAgo", "end_date": "today"}
         result = await run_dynamic_report(
             tokens["access_token"],
             ga4PropertyId,
             metrics,
             dimensions or [],
-            date_range or {"start_date": "30daysAgo", "end_date": "today"},
+            date_range or default_date_range,
             filters or {},
             limit
         )
@@ -57,7 +63,10 @@ async def ask_ga4_report(
         return {"error": "userId, ga4PropertyId et question sont obligatoires"}
 
     # 1. Analyse la question
+    logger.info(f"Analyzing question: {question}")
     params = parse_user_query(question)
+    logger.info(f"Parsed params: {params}")
+    
     metrics = params["metrics"]
     dimensions = params["dimensions"]
     date_range = params["date_range"]

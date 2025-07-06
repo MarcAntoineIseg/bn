@@ -5,9 +5,14 @@ from google.analytics.data_v1beta.types import (
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 import httpx
+import logging
 from utils.ga4_query_parser import parse_user_query
 from services.supabase_client import get_user_tokens
 from utils.token_handler import check_and_refresh_token
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 async def get_session_count(access_token: str, property_id: str):
@@ -102,8 +107,19 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
                 ]
             }
         }
+    
+    # Log de la requête pour debug
+    logger.info(f"GA4 Request URL: {url}")
+    logger.info(f"GA4 Request Body: {body}")
+    
     async with httpx.AsyncClient() as client:
         response = await client.post(url, headers=headers, json=body)
+        
+        # Log de la réponse pour debug
+        logger.info(f"GA4 Response Status: {response.status_code}")
+        if response.status_code != 200:
+            logger.error(f"GA4 Response Error: {response.text}")
+        
         response.raise_for_status()
         data = response.json()
     # Extraction des résultats
@@ -120,30 +136,4 @@ async def run_dynamic_report(access_token: str, property_id: str, metrics: list,
         result.append(entry)
     return result
 
-def parse_user_query(query):
-    # Exemples très simplifiés
-    if "sessions" in query:
-        metrics = ["sessions"]
-    elif "utilisateurs" in query:
-        metrics = ["totalUsers"]
-    # etc.
 
-    if "par pays" in query or "en France" in query:
-        dimensions = ["country"]
-        filters = {"country": "France"} if "France" in query else {}
-    else:
-        dimensions = []
-        filters = {}
-
-    # Détection de la période
-    if "semaine dernière" in query:
-        date_range = {"start_date": "7daysAgo", "end_date": "today"}
-    else:
-        date_range = {"start_date": "30daysAgo", "end_date": "today"}
-
-    return {
-        "metrics": metrics,
-        "dimensions": dimensions,
-        "date_range": date_range,
-        "filters": filters
-    }
