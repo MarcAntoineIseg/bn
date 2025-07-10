@@ -1,0 +1,7 @@
+fastmcp
+pydantic
+supabase
+google-analytics-data
+google-auth
+requests
+python-dotenv
